@@ -71,13 +71,32 @@ int main () {
 
     // showbits(bits);
     // polynomial edc = getEDC(bits, ec + dc);
+    int cycle = dc ;
+    polynomial mcc (ec);
+    polynomial tmp (ec + 1);
     polynomial gen = generator2(ec);
 
-
-    for (auto &byte : gen) {
-        cout << (int) gf256::LOG[byte] << " ";
-        // bits += bitset<8>(byte).to_string();
+    for (int i = 0; i <  dc; i++) {
+        mcc[i] = stoi(bits.substr(i * 8, 8), nullptr, 2);
     }
+
+    while (cycle-->0) {
+        for (int i = 0; i < gen.size(); i++) {
+            tmp[i] = (gf256::LOG[gen[i]] + gf256::LOG[mcc[0]]) % 255;
+            tmp[i] = gf256::EXP[tmp[i]];
+            tmp[i] ^= (i < mcc.size() ? mcc[i] : 0);
+        }
+
+        mcc = tmp;
+        while (mcc[0] == 0) mcc.erase(mcc.begin());
+    }
+
+
+    for (auto &byte : mcc) {
+        cout << (int) byte << " ";
+    }
+    cout << "\n";
+
 
     // display(edc);
     // Uint8Array(17) [1, 59, 13, 104, 189, 68, 209, 30, 8, 163, 65, 41, 229, 98, 50, 36, 59]
