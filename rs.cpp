@@ -21,12 +21,12 @@ void showbits (const string &bits) {
 polynomial getEDC(const std::string &bits, int total) {
     int index = total - 1, ec = total - bits.size() / 8;
     polynomial p(total);
+    polynomial gen = gf256::generator(ec);
 
     for (int i = 0; i < bits.size(); i += 8) {
         p[index--] = stoi(bits.substr(i, 8), nullptr,2);
     }
 
-    polynomial gen = gf256::generator(ec);
     return gf256::rest(p, gen);
 }
 
@@ -37,13 +37,23 @@ void display(const polynomial &rem) {
     printf("\n");
 }
 
+
+polynomial generator2 (int degree) {
+    polynomial poly = {1};
+
+    for (int i = 0; i < degree; i++) {
+        poly = gf256::mul(poly, polynomial({1, gf256::EXP[i]}));
+    }
+
+    return poly;
+}
 int main () {
 
     // cout << "0x" << hex << setfill('0') << setw(2) << EXP[i]  << ", ";
-    const string msg = "https://www.qrcode.com/";
+    const string msg = "Hi";
     const u8 pad[2] = {236,17};
 
-    const u8 version = 2, ecc = 2;
+    const u8 version = 1, ecc = 0;
     int ec = neblocks[version][ecc]; // n ecc  codewords
     int dc = ndblocks[version][ecc]; // n data codewords
 
@@ -56,11 +66,18 @@ int main () {
     bits += bitset<8>(pad[0]).to_string();
     bits += bitset<8>(pad[1]).to_string();
     bits += bitset<8>(pad[0]).to_string();
+    bits += bitset<8>(pad[1]).to_string();
+    bits += bitset<8>(pad[0]).to_string();
 
-    showbits(bits);
-    polynomial edc = getEDC(bits, ec + dc);
+    // showbits(bits);
+    // polynomial edc = getEDC(bits, ec + dc);
+    polynomial gen = generator2(ec);
 
-    for (auto &byte : edc) bits += bitset<8>(byte).to_string();
+
+    for (auto &byte : gen) {
+        cout << (int) gf256::LOG[byte] << " ";
+        // bits += bitset<8>(byte).to_string();
+    }
 
     // display(edc);
     // Uint8Array(17) [1, 59, 13, 104, 189, 68, 209, 30, 8, 163, 65, 41, 229, 98, 50, 36, 59]
