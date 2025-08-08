@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <bitset>
+#include <algorithm>
 
 #include "qr.hpp"
 #include "GF256.hpp"
@@ -23,16 +24,22 @@ int btoi (const std::string &bin, int st, int nd) {
     return stoi(bin.substr(st, nd), nullptr, 2);
 }
 
-polynomial getEDC (const std::string &bits, int total) {
-    int index = total - 1, ec = total - bits.size() / 8;
+polynomial get_bits (const std::string &bits, int total) {
     polynomial p(total);
 
-    for (int i = 0; i < bits.size(); i += 8) {
-        p[index--] = stoi(bits.substr(i, 8), nullptr,2);
+    for (int i = 0, index = total - 1; i < bits.size(); i += 8, index--) {
+        p[index] = stoi(bits.substr(i, 8), nullptr,2);
     }
+    return p;
+}
+polynomial getEDC(const std::string &bits, int total) {
+    const int ec = total - bits.size() / 8;
+    const polynomial gen = gf256::generator(ec);
+    polynomial p = gf256::rest(get_bits(bits, total), gen);
 
-    polynomial gen = gf256::generator(ec);
-    return gf256::rest(p, gen);
+    reverse(p.begin(), p.end());
+
+    return p;
 }
 
 bool get_mask(int level, int x, int y) {
@@ -122,7 +129,7 @@ std::vector<std::vector<int>> mk_grid (int version) {
         {1,0,1,1,1,0,1},
         {1,0,0,0,0,0,1},
         {1,1,1,1,1,1,1} };
-    std::vector<std::vector<int>> grid(size, std::vector<int>(size,2));
+    std::vector<std::vector<int>> grid(size, std::vector<int>(size, 2));
 
     for (int i = 0; i < 8; i++) {
         grid[i][8] = grid[8][i] = 0; // informations for the first eye
@@ -229,9 +236,10 @@ std::vector<std::vector<int>> qr_write (const std::string &msg, int ecc, int mas
         bits += std::bitset<8>(padding[i % 2]).to_string();
     }
 
-    polynomial edc = getEDC(bits, ec + dc);
-    for (auto &byte : edc) bits += std::bitset<8>(byte).to_string();
-
+    // polynomial edc = getEDC(bits, ec + dc);
+    for (auto &byte : getEDC(bits, ec + dc)) {
+        bits += std::bitset<8>(byte).to_string();
+    }
     size = (17 + version * 4);
 
     for (auto &[x,y] : path) {
@@ -301,11 +309,11 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) {
 
 int main () {
 
-    const std::string msg = "https://www.qrcode.com/";
+    std::string msg = "https://www.qrcode.com/";
     // const std::string msg = "Hello, world! 123";
-
-    auto qr = qr_write(msg, M, 7);
-    std::string txt = qr_read(qr);
+    msg = "Hi";
+    auto qr = qr_write(msg, H, 7);
+    // std::string txt = qr_read(qr);
 
     // cout << txt;
 }

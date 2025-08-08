@@ -17,17 +17,22 @@ void showbits (const string &bits) {
     }
     cout << endl;
 }
-
-polynomial getEDC(const std::string &bits, int total) {
-    int index = total - 1, ec = total - bits.size() / 8;
+polynomial get_bits (const std::string &bits, int total) {
     polynomial p(total);
-    polynomial gen = gf256::generator(ec);
 
-    for (int i = 0; i < bits.size(); i += 8) {
-        p[index--] = stoi(bits.substr(i, 8), nullptr,2);
+    for (int i = 0, index = total - 1; i < bits.size(); i += 8, index--) {
+        p[index] = stoi(bits.substr(i, 8), nullptr,2);
     }
+    return p;
+}
+polynomial getEDC(const std::string &bits, int total) {
+    const int ec = total - bits.size() / 8;
+    const polynomial gen = gf256::generator(ec);
+    polynomial p = gf256::rest(get_bits(bits, total), gen);
 
-    return gf256::rest(p, gen);
+    reverse(p.begin(), p.end());
+
+    return p;
 }
 
 void display(const polynomial &rem) {
@@ -36,7 +41,6 @@ void display(const polynomial &rem) {
     }
     printf("\n");
 }
-
 
 polynomial generator2 (int degree) {
     polynomial poly = {1};
@@ -47,6 +51,7 @@ polynomial generator2 (int degree) {
 
     return poly;
 }
+
 int main () {
 
     // cout << "0x" << hex << setfill('0') << setw(2) << EXP[i]  << ", ";
@@ -70,11 +75,10 @@ int main () {
     bits += bitset<8>(pad[0]).to_string();
 
     // showbits(bits);
-    // polynomial edc = getEDC(bits, ec + dc);
     int cycle = dc ;
-    polynomial mcc (ec);
+    polynomial mcc (dc);
     polynomial tmp (ec + 1);
-    polynomial gen = generator2(ec);
+    polynomial gen = generator2(17);
 
     for (int i = 0; i <  dc; i++) {
         mcc[i] = stoi(bits.substr(i * 8, 8), nullptr, 2);

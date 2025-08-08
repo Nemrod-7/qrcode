@@ -1,10 +1,10 @@
 #include <string>
 
-std::string alnum = "|123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
 enum ECC {H,Q,M,L};
 // enum Mtype{MODE, MODSIZE};
 enum MODE {END,NUMERIC,ALPHANUM,STRUCTURED,BYTE,FNC1,_6_,ECI, KANJI};
 // const int Mdb[4][2] = {{1, 4},{2, 6},{4, 8},{8, 16}};
+const std::string alnum = "|123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
 
 //           0 -> 1              1 -> 2                    2 -> 4                         3 -> 8
 // END,     NUMERIC,            ALPHANUM,   STRUCTURED,     BYTE,      FNC1,_6_,ECI,       KANJI
