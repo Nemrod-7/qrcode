@@ -11,12 +11,8 @@
 
 using namespace std;
 
-void showbits (const string &bits) {
-    for (int i = 0; i < bits.size(); i += 8) {
-        cout << stoi(bits.substr(i, 8), nullptr,2) << " ";
-    }
-    cout << endl;
-}
+int bin2int(const std::string &src) { return stoi(src, nullptr, 2); }
+
 polynomial get_bits (const std::string &bits, int total) {
     polynomial p(total);
 
@@ -35,12 +31,6 @@ polynomial getEDC(const std::string &bits, int total) {
     return p;
 }
 
-void display(const polynomial &rem) {
-    for (int i = 0; i < rem.size(); i++) {
-        printf("%i ", rem[i]);
-    }
-    printf("\n");
-}
 
 polynomial generator2 (int degree) {
     polynomial poly = {1};
@@ -67,42 +57,45 @@ int main () {
     for (auto &ch : msg) bits += bitset<8>(ch).to_string();
     bits += "0000";
 
-
     bits += bitset<8>(pad[0]).to_string();
     bits += bitset<8>(pad[1]).to_string();
     bits += bitset<8>(pad[0]).to_string();
     bits += bitset<8>(pad[1]).to_string();
     bits += bitset<8>(pad[0]).to_string();
 
-    // showbits(bits);
+
+    cout << show::bits(bits) << "\n";
     int cycle = dc ;
     polynomial mcc (dc);
     polynomial tmp (ec + 1);
-    polynomial gen = generator2(17);
+    const polynomial gen = generator2(17);
 
-    for (int i = 0; i <  dc; i++) {
+    for (int i = 0; i < dc; i++) {
         mcc[i] = stoi(bits.substr(i * 8, 8), nullptr, 2);
     }
-
+    // cout << "\n";
+    cout << show::simplified(gen) << "\n";
     while (cycle-->0) {
         for (int i = 0; i < gen.size(); i++) {
             tmp[i] = (gf256::LOG[gen[i]] + gf256::LOG[mcc[0]]) % 255;
             tmp[i] = gf256::EXP[tmp[i]];
             tmp[i] ^= (i < mcc.size() ? mcc[i] : 0);
+            
         }
-
         mcc = tmp;
         while (mcc[0] == 0) mcc.erase(mcc.begin());
+        cout << show::simplified(mcc) << "\n";
     }
 
+    cout << show::simplified(mcc) << "\n";
+    // cout << polyshow(mcc);
+    // for (unsigned char &byte : mcc) {
+    //     cout << (int) byte << " ";
+    // }
+    // cout << "\n";
 
-    for (auto &byte : mcc) {
-        cout << (int) byte << " ";
-    }
-    cout << "\n";
 
-
-    // display(edc);
+    // polyshow(edc);
     // Uint8Array(17) [1, 59, 13, 104, 189, 68, 209, 30, 8, 163, 65, 41, 229, 98, 50, 36, 59]
     // Uint8Array(16) [52, 61, 242, 187, 29, 7, 216, 249, 103, 87, 95, 69, 188, 134, 57, 20]
 

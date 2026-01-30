@@ -6,6 +6,41 @@
 using u8 = uint8_t;
 using polynomial = std::vector<u8>;
 
+namespace show {
+    std::string simplified (const polynomial &rem) {
+        std::string os;
+        for (int i = 0; i < rem.size(); i++) {
+            std::string num = std::to_string(rem[i]);
+            os += std::string(3 - num.size(), ' ') + num + " ";
+        }
+        return os;
+    }
+
+    std::string poly (const polynomial &p) {
+        std::string os;
+
+        for (int i = p.size() - 1; i >= 0; i--) {
+            int coef = p[i];
+
+            if (coef != 0) {
+                if (os.size() || coef < 0) os += coef > 0 ? " + " : " - ";
+                if (i == 0 || coef < -1 || coef > 1 ) os += std::to_string(std::abs(coef));
+                if (i > 0) os += "x";
+                if (i > 1) os += "^" + std::to_string(i);
+            }
+        }
+
+        return os;
+    }
+    std::string bits (const std::string &bits) {
+        std::string os;
+        for (int i = 0; i < bits.size(); i += 8) {
+            // cout << bitset<8>(bits.substr(i, 8)) << " ";
+            os += std::to_string(stoi(bits.substr(i, 8), nullptr,2)) + " ";
+        }
+        return os;
+    }
+};
 
 namespace gf256 {
     const unsigned char LOG[256] = {
@@ -87,22 +122,6 @@ namespace gf256 {
         }
 
         return poly;
-    }
-    std::string show (const polynomial &p) {
-        std::string os;
-
-        for (int i = p.size() - 1; i >= 0; i--) {
-            int coef = p[i];
-
-            if (coef != 0) {
-                if (os.size() || coef < 0) os += coef > 0 ? " + " : " - ";
-                if (i == 0 || coef < -1 || coef > 1 ) os += std::to_string(std::abs(coef));
-                if (i > 0) os += "x";
-                if (i > 1) os += "^" + std::to_string(i);
-            }
-        }
-
-        return os;
     }
 
 };

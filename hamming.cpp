@@ -1,7 +1,9 @@
 #include <iostream>
 #include <vector>
+#include <bitset>
 
 using namespace std;
+
 
 string encode (const string &src) {
     // input: "hey"
@@ -41,28 +43,57 @@ string decode (const string &src) {
 
     return os;
 }
-int hamming_weight(int x) {
+int hamming_weight (int x) {
 
-   int weight = 0;
+    int weight = 0;
 
-   while (x > 0) {
+    while (x > 0) {
         weight += x & 1;
         x >>= 1;
     }
 
-   return weight;
+    return weight;
 }
 
-int hamming_distance(const string &a, const string &b) {
+int hamming_distance (const string &a, const string &b) {
     int weight = 0;
 
     for (int i = 0; i < a.size(); i++) {
         if (a[i] != b[i]) weight++;
     }
 
-  return weight;
+    return weight;
+}
+int qr_check_format(int fmt) {
+   int g = 0x537; // 0b10100110111
+   for (int i = 4; i >= 0; i--) {
+       if (fmt & (1 << ( i + 10))) {
+           fmt ^= g << i;
+       }
+   }
+
+   return fmt;
 }
 
+
+int qr_decode_format(int fmt) {
+    int best_fmt = -1;
+    int best_dist = 15;
+
+    for (int i = 0;  i < 32; i++) {
+      int test_code = (i << 10) ^ qr_check_format(i << 10);
+      int test_dist = hamming_weight(fmt ^ test_code);
+
+      if (test_dist < best_dist) {
+          best_dist = test_dist;
+          best_fmt = i;
+      } else if (test_dist == best_dist) { 
+          best_fmt = -1;
+      }
+    }
+
+    return best_fmt;
+}
 int main () {
 
     // string code = encode("hey");
@@ -74,21 +105,25 @@ int main () {
     int minv = 8, index = 0;
 
     for (int i = 0; i < dictionary.size(); i++) {
-      int dist = hamming_distance(code, dictionary[i]);
+        int dist = hamming_distance(code, dictionary[i]);
 
-      if (dist < minv) {
-        minv = dist;
-      index = i;
-}
+        if (dist < minv) {
+            minv = dist;
+            index = i;
+        }
 
-      // cout << i << " " << j << endl;
-}
-for (int i = 0; i < dictionary[index].size(); i++) {
-    if (dictionary[index][i] != code[i]) {
-    cout << "[" << code[i] << "]";
-} else {
-cout << code[i];
-}
-}
+        // cout << i << " " << j << endl;
+    }
+    string text = dictionary[index];
+
+    for (int i = 0; i < text.size(); i++) {
+        cout << std::bitset<8>(text[i]) << " ";
+
+        // if (dictionary[index][i] != code[i]) {
+        //     cout << "[" << code[i] << "]";
+        // } else {
+        //     cout << code[i];
+        // }
+    }
 
 }
