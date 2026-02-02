@@ -4,7 +4,7 @@
 #include <algorithm>
 
 #include "qr.hpp"
-#include "GF256.hpp"
+#include "rs.hpp"
 
 using namespace std;
 
@@ -24,25 +24,7 @@ int btoi (const std::string &bin, int st, int nd) {
     return stoi(bin.substr(st, nd), nullptr, 2);
 }
 
-polynomial get_bits (const std::string &bits, int total) {
-    polynomial p(total);
-
-    for (int i = 0, index = total - 1; i < bits.size(); i += 8, index--) {
-        p[index] = stoi(bits.substr(i, 8), nullptr,2);
-    }
-    return p;
-}
-polynomial getEDC(const std::string &bits, int total) {
-    const int ec = total - bits.size() / 8;
-    const polynomial gen = gf256::generator(ec);
-    polynomial p = gf256::rest(get_bits(bits, total), gen);
-
-    reverse(p.begin(), p.end());
-
-    return p;
-}
-
-bool get_mask(int level, int x, int y) {
+bool set_mask(int level, int x, int y) {
     switch(level) {
         case 0 : return	(y + x) % 2 == 0;
         case 1 : return	(y) % 2 == 0;
@@ -236,14 +218,17 @@ std::vector<std::vector<int>> qr_write (const std::string &msg, int ecc, int mas
         bits += std::bitset<8>(padding[i % 2]).to_string();
     }
 
-    // polynomial edc = getEDC(bits, ec + dc);
-    for (auto &byte : getEDC(bits, ec + dc)) {
-        bits += std::bitset<8>(byte).to_string();
+    const polynomial edc = rs_encode(get_bits2(bits, ec + dc), ec);
+    cout << show::simplified(edc) << "\n";
+
+    for (int i = dc; i < edc.size(); i++) {
+        bits += std::bitset<8>(edc[i]).to_string();
     }
+    cout << bits.size() << " " << ec + dc << "\n";
     size = (17 + version * 4);
 
     for (auto &[x,y] : path) {
-        grid[x][y] = get_mask(mask, x, y);
+        grid[x][y] = set_mask(mask, x, y);
     }
 
     // print format infos on the grid
@@ -257,8 +242,8 @@ std::vector<std::vector<int>> qr_write (const std::string &msg, int ecc, int mas
         auto &[x,y] = path[i];
         grid[y][x] = grid[y][x] ^ (bits[i] - 48);
     }
-
-    Infos::grid(grid);
+    Infos::show(ecc, mode, version);
+    // Infos::grid(grid);
     return grid;
 }
 std::string qr_read (const std::vector<std::vector<int>> &qr) {
@@ -267,12 +252,17 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) {
     const int mask =  btoi(qr[8], 2, 4);
     const int version = (size - 17) / 4;
     // auto path = scan(free_zone(version));
+    const int ec = neblocks[version][ecc]; // n ecc  codewords
+    const int dc = ndblocks[version][ecc]; // n data codewords
     std::string msg, bits;
 
     for (auto &[x,y] : scan(mk_grid(version))) {
-        bits += (get_mask(mask, x, y) ^ qr[y][x]) + '0';
+        bits += (set_mask(mask, x, y) ^ qr[y][x]) + '0';
     }
 
+    cout << bits.size() << " " << ec + dc << "\n";
+    // const polynomial edc = get_bits2(bits, ec + dc);
+    // cout << show::simplified(edc) << "\n";
     int mode = btoi(bits,0, 4);
     int mlen = 0;
 
@@ -311,9 +301,10 @@ int main () {
 
     std::string msg = "https://www.qrcode.com/";
     // const std::string msg = "Hello, world! 123";
-    msg = "Hi";
+    // msg = "Hi";
     auto qr = qr_write(msg, H, 7);
-    // std::string txt = qr_read(qr);
+
+    std::string txt = qr_read(qr);
 
     // cout << txt;
 }

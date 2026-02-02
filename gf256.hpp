@@ -19,17 +19,16 @@ namespace show {
     std::string poly (const polynomial &p) {
         std::string os;
 
-        for (int i = p.size() - 1; i >= 0; i--) {
-            int coef = p[i];
+        for (int i = 0; i < p.size(); i++) {
+            u8 val = p[i], ex = p.size() - i - 1;
 
-            if (coef != 0) {
-                if (os.size() || coef < 0) os += coef > 0 ? " + " : " - ";
-                if (i == 0 || coef < -1 || coef > 1 ) os += std::to_string(std::abs(coef));
-                if (i > 0) os += "x";
-                if (i > 1) os += "^" + std::to_string(i);
+            if (val != 0) {
+                if (os.size() || val < 0) os += val > 0 ? " + " : " - ";
+                os += std::to_string(abs(val));
+                if (ex > 0) os += "x";
+                if (ex > 1) os += "^" + std::to_string(ex);
             }
         }
-
         return os;
     }
     std::string bits (const std::string &bits) {
@@ -86,7 +85,35 @@ namespace gf256 {
     u8 mul (u8 a, u8 b) { return a && b ? EXP[(LOG[a] + LOG[b]) % 255] : 0; }
     u8 div (u8 a, u8 b) { return EXP[(LOG[a] + LOG[b] * 254) % 255]; }
 
-    std::vector<u8> mul (const polynomial &p1, const polynomial &p2) {
+    u8 evaluate (const polynomial &p, u8 arg) { // polynomial evaluation
+        // p : polynomial argument
+        // arg : independant variable
+        // val : dependent value
+        u8 val = p[0];
+
+        for (int i = 1; i < p.size(); i++) {
+            val = gf256::mul(val, arg) ^ p[i];
+        }
+
+        return val;
+    }
+
+    polynomial add (const polynomial &a, const polynomial &b) {
+        const int size = std::max(a.size(), b.size());
+        const int ov = size - b.size();
+        polynomial res (size);
+
+        for (int i = 0; i < a.size(); i++) {
+            res[i + size - a.size()] = a[i];
+        }
+
+        for (int i = 0; i < b.size(); i++) {
+            res[i + ov] = add(res[i + ov], b[i]);
+        }
+
+        return res;
+    }
+    polynomial mul (const polynomial &p1, const polynomial &p2) {
         polynomial poly (p1.size() + p2.size() - 1);
 
         for (u8 i = 0; i < p1.size(); i++) {
@@ -96,33 +123,27 @@ namespace gf256 {
         }
         return poly;
     }
-    polynomial rest (const polynomial &dividend, const polynomial &divisor) {
-        const int size = dividend.size() - divisor.size() + 1;
-        polynomial rest = dividend;
 
-        for (size_t i = 0; i < size; i++) {
-            if (rest.back()) {
-                u8 factor = rest.back() / divisor.back();
-                polynomial res = gf256::mul (divisor, {factor});
 
-                for (size_t j = 0; j < res.size(); j++) {
-                    rest[rest.size() - res.size() + j] ^= res[j];
-                }
-            }
-            rest.pop_back();
+    polynomial rescale (const polynomial &p, u8 z) { // polynomial scaling by z
+        polynomial res (p.size());
+
+        for (int i = 0; i < p.size(); i++) {
+            res[i] = gf256::mul(p[i], z);
         }
 
-        return rest;
+        return res;
     }
-    polynomial generator(int degree) {
-        polynomial poly = {1};
+    polynomial syndrome(const polynomial &p, int size) { // generate the syndrome polynomial
+        polynomial syn (size);
 
-        for (int i = 0; i < degree; i++) {
-            poly = gf256::mul(poly, polynomial({EXP[i],1}));
+        for (int i = 0; i < size; i++) {
+            syn[i] = gf256::evaluate(p, gf256::EXP[i]);
         }
 
-        return poly;
+        return syn;
     }
+
 
 };
 
@@ -137,4 +158,47 @@ namespace gf256 {
 //         // printf("%i %i\n", EXP[i], exp);
 //         exp <<= 1;
 //     }
+// }
+// std::string poly (const polynomial &p) {
+//     std::string os;
+//
+//     for (int i = p.size() - 1; i >= 0; i--) {
+//         int coef = p[i], ex = p.size() - i - 1;
+//
+//         if (coef != 0) {
+//             if (os.size() || coef < 0) os += coef > 0 ? " + " : " - ";
+//             if (ex == 0 || coef < -1 || coef > 1 ) os += std::to_string(std::abs(coef));
+//             if (ex > 0) os += "x";
+//             if (ex > 1) os += "^" + std::to_string(ex);
+//         }
+//     }
+//
+//     return os;
+// }
+// polynomial generator(int degree) {
+//     polynomial poly = {1};
+//
+//     for (int i = 0; i < degree; i++) {
+//         poly = gf256::mul(poly, polynomial({EXP[i],1}));
+//     }
+//
+//     return poly;
+// }
+// polynomial rest (const polynomial &dividend, const polynomial &divisor) {
+//     const int size = dividend.size() - divisor.size() + 1;
+//     polynomial rest = dividend;
+//
+//     for (size_t i = 0; i < size; i++) {
+//         if (rest.back()) {
+//             u8 factor = rest.back() / divisor.back();
+//             polynomial res = gf256::mul (divisor, {factor});
+//
+//             for (size_t j = 0; j < res.size(); j++) {
+//                 rest[rest.size() - res.size() + j] ^= res[j];
+//             }
+//         }
+//         rest.pop_back();
+//     }
+//
+//     return rest;
 // }
