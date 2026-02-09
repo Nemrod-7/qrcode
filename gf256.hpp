@@ -124,7 +124,6 @@ namespace gf256 {
         return poly;
     }
 
-
     polynomial rescale (const polynomial &p, u8 z) { // polynomial scaling by z
         polynomial res (p.size());
 
@@ -143,8 +142,6 @@ namespace gf256 {
 
         return syn;
     }
-
-
 };
 
 // void generate_table() {

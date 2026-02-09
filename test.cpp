@@ -1,128 +1,66 @@
 #include <iostream>
 #include <vector>
+#include <algorithm>
 #include <bitset>
 
 using namespace std;
 
-enum MODE {END,NUMERIC,ALPHANUM,STRUCTURED,BYTE,FNC1,_6_,ECI, KANJI};
-
-std::string alnum = "|123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
-
-const int length_bits[3][9] = {
-    {0,10, 9,0, 8,0,0,0, 8}, // version  1- 9
-    {0,12,11,0,16,0,0,0,10}, // version 10-26
-    {0,14,13,0,16,0,0,0,12}  // version 27-40
-};
+enum ECC {M, L, H, Q};
 
 
-int getlen (int version, int mode) {
-  if (version < 10) {
-      return length_bits[0][mode];
-  } else if (version < 27) {
-      return length_bits[1][mode];
-  } else {
-      return length_bits[1][mode];
-  }
-}
+int bin2int(const std::string &src) { return stoi(src, nullptr, 2); }
 
-std::string encode (const std::string &msg, int mode) {
-    std::string bits;
+int gen_format_info(int ecc, int mask) {
+    // generator polynomial x^10 + x^8 + x^5 + x^4 + x^2 + x + 1 (binary form : 10100110111 integer : 1335)
 
-    if (mode == NUMERIC) {
-        string num = "   ";
-        for (int i = 0; i < msg.size(); i += 3) {
-            num[0] = msg[i+0];
-            num[1] = (i + 1) < msg.size() ? (msg[i+1]) : 0;
-            num[2] = (i + 2) < msg.size() ? (msg[i+2]) : 0;
+    // the qr format info is in the form [ info ][error correction]
+    //                                   [5 bits][     10 bits    ]
+    // gen : 010100110111000 ( polynomial padded to match the information size (ie : 15 bits))
+    // num : 011000000000000 (ex for ecc 1 and mask 4 -> [01100][00000 00000])
+    const int num = ((ecc << 3) | mask) << 10;
+    int gen = 1335 << 3; // "10100110111000";
+    int res = num;
 
-            switch(num.size()) {
-                case 1 : bits += std::bitset<4>(stoi(num)).to_string(); break;
-                case 2 : bits += std::bitset<2>(stoi(num)).to_string(); break;
-                case 3 : bits += std::bitset<10>(stoi(num)).to_string(); break;
-            }
-        }
-    } else if (mode == ALPHANUM) {
-        for (int i = 0; i < msg.size(); i += 2) {
-            int i1 = alnum.find(msg[i+0]);
-            int i2 = alnum.find(msg[i+1]);
-
-            bits += std::bitset<11>(i1 * 45 + i2).to_string();
-        }
-    } else if (mode == BYTE) {
-        for (int i = 0; i < msg.size(); i++) {
-            bits += std::bitset<8>(msg[i]).to_string();
-        }
-    } else if (mode == KANJI) {
-
+    // performs 4 division
+    for (int i = 0; i < 4; i++) {
+        res ^= (gen >> i);
     }
-
-    return bits;
-}
-
-std::vector<int> getbyte (std::string bits, int st, int nd, int nbits) {
-    std::vector<int> v;
-    for (int i = st; i < nd; i += nbits) {
-        int ii = stoi(bits.substr(i, nbits), nullptr, 2);
-        v.push_back(ii);
-    }
-    return v;
-}
-std::string decode (const std::string &bits, int mode, int size) {
-    std::string txt;
-
-    if (mode == NUMERIC) {
-        for (auto &it : getbyte(bits, 0, (size * 10) / 3, 10)) {
-            txt += std::to_string(it);
-        }
-    } else if (mode == ALPHANUM) {
-        for (auto &it : getbyte(bits, 0, (size * 11) / 2, 11)) {
-            txt += alnum[it / 45] + alnum[it % 45];
-        }
-    } else if (mode == BYTE) {
-        for (auto &it : getbyte(bits, 0, (size * 8) , 8)) {
-            txt += it;
-        }
-    }
-
-    return txt;
+    // mask it (xor) with 101010000010010 (ie : 21522 in integer form (qr specification))
+    return (num | res) ^ 21522;
 }
 
 int main () {
+    cout << "\n\n\n";
+    int version = 7;
+    int nbits = 6;
+    // L=1, M=0, Q=3, H=2
 
-    int version = 1;
-    int mode = NUMERIC;
-    string msg = "250190";
-    string bits = std::bitset<4>(mode).to_string();
 
-    bits += std::string(getlen(version, mode) - 8, '0') + std::bitset<8>(msg.size()).to_string();
+    // golay error code
+    // the bch 18,6
+    //                 [6 bits ][ 12 bits             ]
+    // version string :[version][error correction code]
+    // generator polynomial : x^12 + x^11 + x^10 + x^9 + x^8 + x^5 + x^2 + 1
+    // generator polynomial : 1111100100101 in binary form (integer 7973)
+    const int num = version << 12;
+    int gen = 7973 << 0;
+    int res = num;
 
-    std::string num = "   ";
-    for (int i = 0; i < msg.size(); i += 3) {
-        num[0] = msg[i+0];
-        num[1] = (i + 1) < msg.size() ? (msg[i+1]) : 0;
-        num[2] = (i + 2) < msg.size() ? (msg[i+2]) : 0;
+    // cout << bitset<18>(num) << "\n";
+    // cout << bitset<18>(gen) << "\n";
 
-        switch(num.size()) {
-            case 1 : bits += std::bitset<4>(stoi(num)).to_string(); break;
-            case 2 : bits += std::bitset<2>(stoi(num)).to_string(); break;
-            case 3 : bits += std::bitset<10>(stoi(num)).to_string(); break;
-        }
+    // for (int i = 0; i < 6; i++) {
+    //     res ^= (gen >> i);
+    //     cout << bitset<18>(res) << "\n";
+    // }
+    //
+    for (int i = 0; i < 4; i++) {
+      cout << i << "  " << (i ^ 2) << "\n";
     }
 
-    bits += "000";
-    bits += std::bitset<8>(236).to_string();
-    bits += std::bitset<8>(17).to_string();
-    bits += std::bitset<8>(236).to_string();
-    ////////////////////////////////////////////////////////////////////////////
-    // mode = getbyte(bits, 0,4,4)[0];
+    // cout << (0 ^ 2) << "\n";
+    // cout << (1 ^ 2) << "\n";
 
-    int nbits = getlen(version, mode);
-    int size = getbyte(bits, 4, 4 + nbits, nbits)[0];
 
-    bits = bits.substr(4 + nbits);
-    string txt = decode(bits, mode, size);
-
-    
-    cout << endl;
-
+    cout << "\nend\n";
 }

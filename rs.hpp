@@ -1,13 +1,37 @@
 #include <algorithm>
-
 #include "gf256.hpp"
 
+std::string int2bin (const std::vector<u8> &v) {
+    std::string bin;
+    for (auto &it : v) bin += std::bitset<8>(it).to_string();
+    return bin;
+}
 int bin2int(const std::string &src) { return stoi(src, nullptr, 2); }
 //////////////////////////////////reed-solomon//////////////////////////////////
+// polynomial forney (const polynomial &synd, const polynomial &errpos, int errSize) { // formey algorithm
+//
+//     polynomial syn = synd;
+//     u8 termX, termY;
+//
+//     for (int i = 0; i < errpos.size(); i++) {
+//         // termX = errSize - 1 - errpos[i];
+//         termX = gf256::EXP[errSize - 1 - errpos[i]];
+//
+//         for (int j = 0; j < syn.size() - 1; j++) {
+//             // termY = gf256::mul(syn[j], termX);
+//             // termY ^= syn[j + 1];
+//             // termY = termY;
+//             syn[j] = gf256::mul(syn[j], termX) ^ syn[j + 1];
+//         }
+//         syn.pop_back();
+//     }
+//
+//     return syn;
+// }
 polynomial get_bits2 (const std::string &bits, int total) {
     polynomial p(total);
 
-    for (int i = 0; i * 8 < bits.size(); i++) {
+    for (int i = 0; (i < total) && ((i * 8) < bits.size()); i++) {
         p[i] = stoi(bits.substr(i * 8, 8), nullptr, 2);
     }
     return p;
@@ -22,26 +46,6 @@ polynomial generator2 (int degree) {
     return poly;
 }
 
-polynomial forney (const polynomial &synd, const polynomial &errpos, int errSize) { // formey algorithm
-
-    polynomial syn = synd;
-    u8 termX, termY;
-
-    for (int i = 0; i < errpos.size(); i++) {
-        termX = errSize - 1 - errpos[i];
-        termX = gf256::EXP[termX];
-
-        for (int j = 0; j < syn.size() - 1; j++) {
-            // termY = gf256::mul(syn[j], termX);
-            // termY ^= syn[j + 1];
-            // termY = termY;
-            syn[j] = gf256::mul(syn[j], termX) ^ syn[j + 1];
-        }
-        syn.pop_back();
-    }
-
-    return syn;
-}
 polynomial find_err (const polynomial &errpos, int size) { // locate the message error
 
     polynomial errlist;
@@ -77,7 +81,7 @@ polynomial find_err (const polynomial &errpos, int size) { // locate the message
         std::cout << "Too many errors to correct";
         return {};
     } else {
-        // std::cout << "Error count { ", cnt, len(errpos));
+        std::cout << "Error count : " << cnt << "\n";
     }
 
     // calculate the polynomial zeroes
@@ -100,6 +104,7 @@ polynomial find_err (const polynomial &errpos, int size) { // locate the message
 polynomial correct (polynomial blocks, const polynomial &syn, const polynomial &errors) {
 
     polynomial locator = {1};
+    polynomial errLoci;
     // prepare the locator polynomial
     for (auto &err : errors) {
         u8 errTerm = blocks.size() - err - 1;
@@ -119,13 +124,11 @@ polynomial correct (polynomial blocks, const polynomial &syn, const polynomial &
 
     // the error locator polynomial, minus even terms
     // errLoci = locator[locator.size() % 1 : locator.size() : 2];
-    polynomial errLoci;
 
     for (int i = 0; i < locator.size(); i += 2) {
         errLoci.push_back(locator[i]);
     }
 
-    // start correcting
     for (auto &err : errors) {
         u8 errbyte = err - blocks.size() + 256;
         errbyte = gf256::EXP[errbyte];
@@ -141,10 +144,10 @@ polynomial correct (polynomial blocks, const polynomial &syn, const polynomial &
     return blocks;
 }
 
-polynomial rs_encode (const polynomial &mdc, int ec) {
-    const int dc = mdc.size() - ec;
-    const polynomial gen = generator2(ec);
-    polynomial edc = mdc;
+polynomial rs_encode (const polynomial &data, int degree) {
+    const int dc = data.size() - degree;
+    const polynomial gen = generator2(degree);
+    polynomial edc = data;
     // cout << show::poly(gen) << "\n";
     for (int i = 0; i < dc; i++) {
         u8 ch = edc[i];
@@ -154,49 +157,63 @@ polynomial rs_encode (const polynomial &mdc, int ec) {
     }
 
     for (int i = 0; i < dc; i++) {
-        edc[i] = mdc[i];
+        edc[i] = data[i];
     }
 
     return edc;
 }
-polynomial rs_decode (polynomial blocks, int errSize) {
+polynomial rs_decode (const polynomial &data, int degree) {
 
-    polynomial erased;
+    // polynomial erased;
     // count the number of erasures
-    for (int i = 0; i < blocks.size(); i++) {
-        if (blocks[i] < 0) {
-            blocks[i] = 0;
-            erased.push_back(i);
-        }
-    }
-
-    if (erased.size() > errSize) {
-        std::cout << "\nToo many erasures\n";
-        return {};
-    }
+    // for (int i = 0; i < data.size(); i++) {
+    //     if (data[i] < 0) {
+    //         data[i] = 0;
+    //         erased.push_back(i);
+    //     }
+    // }
+    //
+    // if (erased.size() > degree) {
+    //     std::cout << "\nToo many erasures\n";
+    //     return {};
+    // }
     // prepare the syndrome polynomial
-    const polynomial synd = gf256::syndrome(blocks, errSize);
+    const polynomial synd = gf256::syndrome(data, degree);
 
     if (*max_element(synd.begin(), synd.end()) == 0) {
-        std::cout << "\nThe message has no errors\n";
-        return blocks;
+        std::cout << "\nThe data has no errors\n";
+        return data;
     }
+    // const polynomial locator = forney(synd, erased, data.size()); // prepare the error locator polynomial
+    // const polynomial errors = find_err(locator, data.size()); // locate the message errors
+    const polynomial errors = find_err(synd, data.size()); // locate the message errors
 
-    const polynomial locator = forney(synd, erased, blocks.size()); // prepare the error locator polynomial
-    polynomial errlist = find_err(locator, blocks.size()); // locate the message errors
-
-    if (errlist.size() == 0) {
+    if (errors.size() == 0) {
         std::cout << "\nCould not find any errors\n";
         return {};
     } else {
-        // cout << "Located errors: ", errlist;
+        std::cout << "\nLocated errors: " << show::simplified(errors) << "\n";
     }
 
-    for (const auto &it : erased) errlist.push_back(it);
-
-    return correct(blocks, synd, errlist);
+    // for (const auto &it : erased) errors.push_back(it);
+    return correct(data, synd, errors);
 }
 
+// std::vector<u8> bitstobyte (const std::string &bits, int start, int end) {
+//     std::vector<u8> v;
+//     for (int i = start; i < end; i += 8) {
+//         v.push_back(stoi(bits.substr(i, 8), nullptr, 2));
+//     }
+//     return v;
+// }
+// int btoi (const std::vector<int> &bin, int st, int nd) {
+//     int num = 0;
+//     for (int i = 0; i < nd; i++) num |= bin[i + st] << i;
+//     return num;
+// }
+// int btoi (const std::string &bin, int st, int nd) {
+//     return stoi(bin.substr(st, nd), nullptr, 2);
+// }
 // polynomial get_bits (const std::string &bits, int total) {
 //     polynomial p(total);
 //

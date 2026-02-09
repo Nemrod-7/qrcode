@@ -1,55 +1,64 @@
 #include <iostream>
-#include <cstdint>
-// #include <fstream>
-// #include <iomanip>
 #include <vector>
 #include <bitset>
 
 #include "rs.hpp"
-#include "qr.hpp"
+#include "grid.hpp"
+
+// using u8 = unsigned short int;
+// using polynomial = std::vector<u8>;
+
 
 using namespace std;
+
+// std::string int2bin (const std::vector<u8> &v) {
+//     std::string bin;
+//     for (auto &it : v) bin += std::bitset<8>(it).to_string();
+//     return bin;
+// }
+// int bin2int(const std::string &src) { return stoi(src, nullptr, 2); }
+
+// polynomial get_bits2 (const std::string &bits, int total) {
+//     polynomial p(total);
+//
+//     for (int i = 0; (i < total) && ((i * 8) < bits.size()); i++) {
+//         p[i] = stoi(bits.substr(i * 8, 8), nullptr, 2);
+//     }
+//     return p;
+// }
+
+std::vector<u8> getbyte (std::string bits, int st, int nd, int nbits) {
+    std::vector<u8> v;
+    for (int i = st; i < nd; i += nbits) {
+        v.push_back(stoi(bits.substr(i, nbits), nullptr, 2));
+    }
+    return v;
+}
+//////////////////////////////////reed-solomon//////////////////////////////////
 
 int main () {
 
     std::cout << "\n\n\n";
     // cout << "0x" << hex << setfill('0') << setw(2) << EXP[i]  << ", ";
-    const std::string msg = "Hi";
-    const u8 pad[2] = {236,17};
+    const int version = 10;
+    const int size = 17 + version * 4;
 
-    const u8 version = 1, ecc = 0;
-    int ec = neblocks[version][ecc]; // n ecc  codewords
-    int dc = ndblocks[version][ecc]; // n data codewords
+    // grid qr = mk_grid(version);
+    // polynomial code(get_bits2(sub1 + sub2, dc + ec));
 
-    auto bits = bitset<4>(4).to_string(); // BYTE
-    bits += bitset<8>(msg.size()).to_string(); // SIZE
-    for (auto &ch : msg) bits += bitset<8>(ch).to_string();
-    bits += "0000";
+    for (int i = 7; i < 8; i++) {
+        string num = bitset<6>(i).to_string();
+        string src = bitset<18>(versinfo[i]).to_string();
 
-    bits += bitset<8>(pad[0]).to_string();
-    bits += bitset<8>(pad[1]).to_string();
-    bits += bitset<8>(pad[0]).to_string();
-    bits += bitset<8>(pad[1]).to_string();
-    bits += bitset<8>(pad[0]).to_string();
-    // cout << show::bits(bits) << "\n";
+        std::vector<u8> poly = getbyte(src, 0, src.size(), 6);
+        // rs_decode(poly, 2);
 
-    const polynomial edc = rs_encode(get_bits2(bits, ec + dc), ec);
-    // cout << show::simplified(edc) << "\n";
-
-    for (int i = dc; i < edc.size(); i++) {
-      cout << (int) edc[i] << " ";
-    }
-    // edc[3] = 9;
-    // edc[7] = -1;
-    // edc[10] = 50;
-    // cout << ec << " " << dc << "\n";
-    const polynomial clean = rs_decode(edc, ec);
-
-    for (auto &byte : edc) {
-        // bits += std::bitset<8>(byte).to_string();
+        for (auto it : poly) {
+            cout << to_string(it) << " ";
+        }
+        cout << "\n";
     }
 
-    cout << show::simplified(clean) << "\n";
 
     std::cout << "\nexit\n";
 }
