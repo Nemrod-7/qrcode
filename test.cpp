@@ -5,8 +5,19 @@
 
 using namespace std;
 
-enum ECC {M, L, H, Q};
+#include "grid.hpp"
 
+
+static std::string grid (const std::vector<std::vector<int>> &grid) {
+    std::string os;
+    for (int i = 0; i < grid.size(); i++) {
+        for (int j = 0; j < grid.size(); j++) {
+            os += (grid[i][j] == 0) ? ". " : "# ";
+        }
+        os += '\n';
+    }
+    return os;
+}
 
 int bin2int(const std::string &src) { return stoi(src, nullptr, 2); }
 
@@ -29,38 +40,68 @@ int gen_format_info(int ecc, int mask) {
     return (num | res) ^ 21522;
 }
 
-int main () {
-    cout << "\n\n\n";
-    int version = 7;
-    int nbits = 6;
-    // L=1, M=0, Q=3, H=2
+void golay_code() {
+  int version = 7;
+  int nbits = 6;
+      // golay error code
+      // the bch 18,6
+      //                 [6 bits ][ 12 bits             ]
+      // version string :[version][error correction code]
+      // generator polynomial : x^12 + x^11 + x^10 + x^9 + x^8 + x^5 + x^2 + 1
+      // generator polynomial : 1111100100101 in binary form (integer 7973)
+      const int num = version << 12;
+      int gen = 7973 << 0;
+      int res = num;
 
+      // cout << bitset<18>(num) << "\n";
+      // cout << bitset<18>(gen) << "\n";
 
-    // golay error code
-    // the bch 18,6
-    //                 [6 bits ][ 12 bits             ]
-    // version string :[version][error correction code]
-    // generator polynomial : x^12 + x^11 + x^10 + x^9 + x^8 + x^5 + x^2 + 1
-    // generator polynomial : 1111100100101 in binary form (integer 7973)
-    const int num = version << 12;
-    int gen = 7973 << 0;
-    int res = num;
+      // for (int i = 0; i < 6; i++) {
+      //     res ^= (gen >> i);
+      //     cout << bitset<18>(res) << "\n";
+      // }
+      //
+}
 
-    // cout << bitset<18>(num) << "\n";
-    // cout << bitset<18>(gen) << "\n";
+std::vector<std::vector<int>> micro_qr (int version) { // M1, M2, M3, M4
+    const int size = 2 * version + 11;
+    std::vector<std::vector<int>> grid(size, std::vector<int>(size, 2));
+    finder(grid, 3, 3);
 
-    // for (int i = 0; i < 6; i++) {
-    //     res ^= (gen >> i);
-    //     cout << bitset<18>(res) << "\n";
-    // }
-    //
-    for (int i = 0; i < 4; i++) {
-      cout << i << "  " << (i ^ 2) << "\n";
+    for (int i = 0; i < 8; i++) {
+        grid[7][i] = grid[i][7] = 0; // quiet zone
+        grid[8][i + 1] = grid[i + 1][8] = 0; // format information zone
     }
 
-    // cout << (0 ^ 2) << "\n";
-    // cout << (1 ^ 2) << "\n";
+    for (int i = 8; i < size; i++) { // timing patttern
+        grid[0][i] = grid[i][0] = i % 2 == 0;
+    }
 
+    return grid;
+}
+
+int main () {
+    cout << "\n\n\n";
+
+    // L=1, M=0, Q=3, H=2
+
+    int size = 11;
+
+    for (int i = 0; i < 4; i++) {
+        cout << grid(micro_qr(i)) << "\n";
+    }
+
+    //
+    // for (int i = 0; i < size; i++) {
+    //   for (int j = 0; j < size; j++) {
+    //       if (grid[i][j] == 0) {
+    //           // cout << "  ";
+    //       } else {
+    //       }
+    //       cout << grid[i][j] << " ";
+    //   }
+    //   cout << '\n';
+    // }
 
     cout << "\nend\n";
 }

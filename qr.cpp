@@ -9,6 +9,13 @@
 
 using namespace std;
 
+/* to implement :
+  - KANJI coding and decoding
+    ECI encoding and decodin
+    Version information Golay code encoding and decoding
+    Format information decoding
+*/
+
 using u8 = uint8_t;
 using grid = std::vector<std::vector<int>>;
 
@@ -67,7 +74,7 @@ int get_version(const std::vector<std::vector<int>> &qr) {
     return 0;
 }
 int gen_format_info(int ecc, int mask) {
-    // generate the information error code 
+    // generate the information error code
     // generator polynomial x^10 + x^8 + x^5 + x^4 + x^2 + x + 1 (binary form : 10100110111 integer : 1335)
 
     // the qr format info is in the form [ info ][error correction]
@@ -228,8 +235,8 @@ std::vector<std::vector<int>> qr_write (const std::string &msg, int ecc) { // up
 
     if (version == 0) return {};
 
-    const int ndata = codewords[version][ecc]; // total of data codewords
-    const int ec = ecsize[version][ecc];   // number of ecc codewords by block
+    const int ndata = codewords[ecc][version]; // total of data codewords
+    const int ec = ecsize[ecc][version];   // number of ecc codewords by block
     const int nb = err_blocks[ecc][version]; // number of ecc blocks
     const int dc = ndata / nb;               // number of data codeword for each ecc block
 
@@ -328,8 +335,8 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version
     const int ecc = bin2int(format[0].substr(0,2)) ^ 3;
     const int mask = bin2int(format[0].substr(2,3)) ^ 5;
 
-    const int ndata = codewords[version][ecc]; // total of data codewords
-    const int ec = ecsize[version][ecc];   // number of ecc codewords by block
+    const int ndata = codewords[ecc][version]; // total of data codewords
+    const int ec = ecsize[ecc][version];   // number of ecc codewords by block
     const int nb = err_blocks[ecc][version]; // number of ecc blocks
     const int dc = ndata / nb;               // number of data codeword for each ecc block
 
@@ -374,6 +381,7 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version
 }
 
 int main () {
+
 
     cout << "\n\n\n";
     std::string msg = "https://jbirnick.github.io/";
