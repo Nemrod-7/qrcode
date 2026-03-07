@@ -10,14 +10,12 @@
 using namespace std;
 
 /* to implement :
-  - KANJI coding and decoding
-    ECI encoding and decodin
+    ECI encoding and decoding
+    FNC1 encoding and decoding
+    KANJI encoding and decoding
     Version information Golay code encoding and decoding
     Format information decoding
 */
-
-using u8 = uint8_t;
-using grid = std::vector<std::vector<int>>;
 
 std::vector<int> getbyte (std::string bits, int st, int nd, int nbits) {
     std::vector<int> v;
@@ -28,6 +26,19 @@ std::vector<int> getbyte (std::string bits, int st, int nd, int nbits) {
     return v;
 }
 
+bool set_mask(int level, int x, int y) {
+    switch(level) {
+        case 0 : return	(y + x) % 2 == 0;
+        case 1 : return	(y) % 2 == 0;
+        case 2 : return (x) % 3 == 0;
+        case 3 : return (y + x) % 3 == 0;
+        case 4 : return ( (y / 2) + (x / 3) ) % 2 == 0;
+        case 5 : return ((y * x) % 2) + ((y * x) % 3) == 0;
+        case 6 : return ( ((y * x) % 2) + ((y * x) % 3) ) % 2 == 0;
+        case 7 : return ( ((y + x) % 2) + ((y * x) % 3) ) % 2 == 0;
+        default : return 0;
+    }
+}
 int get_mode (const std::string &src) {
 
     enum MODE mode = NUMERIC;
@@ -51,7 +62,7 @@ int get_len (int version, int mode) {
         return length_bits[2][mode];
     }
 }
-int get_version(const std::vector<std::vector<int>> &qr) {
+int get_version (const std::vector<std::vector<int>> &qr) {
     int byte[2] = {0,0};
 
     for (int i = 0; i < 3; i++) {
@@ -62,7 +73,7 @@ int get_version(const std::vector<std::vector<int>> &qr) {
     }
     // Golay Error Detection And Correction Code
     if (byte[0] != byte[1]) {
-        // todo implement th corection algorithm
+        // todo implement the correction algorithm
         cout << "\ninformation data corrupted.\n";
     }
 
@@ -73,40 +84,32 @@ int get_version(const std::vector<std::vector<int>> &qr) {
     }
     return 0;
 }
-int gen_format_info(int ecc, int mask) {
+
+
+int gen_format_info (int ecc, int mask) { // (15,5) BCH code for t = 3 Suitable for hardware-style or embedded implementations
     // generate the information error code
-    // generator polynomial x^10 + x^8 + x^5 + x^4 + x^2 + x + 1 (binary form : 10100110111 integer : 1335)
+    // standard narrow-sense primitive BCH over GF(2) generator polynomial
+    // g(x) = x^10 + x^8 + x^5 + x^4 + x^2 + x + 1 (binary : 10100110111 integer : 1335 hex : 0x537)
 
+    // (Bose–Chaudhuri–Hocquenghem code) [5 bits][     10 bits    ]
     // the qr format info is in the form [ info ][error correction]
-    //                                   [5 bits][     10 bits    ]
-    // gen : 010100110111000 ( polynomial padded to match the information size (ie : 15 bits))
-    // num : 011000000000000 (ex for ecc 1 and mask 4 -> [01100][00000 00000])
-    const int num = ((ecc << 3) | mask) << 10;
-    int gen = 1335 << 3; // "10100110111000";
-    int res = num;
+    // [ecc (2 bits) | mask (3 bits)][ BCH code (10 bits) ]
 
-    // performs 4 division
-    for (int i = 0; i < 4; i++) {
-        res ^= (gen >> i);
+    // gen : 01010 0110111000 ( polynomial padded to match the information size (ie : 15 bits))
+    // num : 01100 0000000000 (ex for ecc 1 and mask 4 -> [01100][00000 00000])
+    // For decoding (syndrome computation + Berlekamp–Massey), additional GF(16) arithmetic is required
+    const int msg = ((ecc << 3) | mask);
+    int gen = 0x537; // "10100110111000";
+    int res = msg << 10;
+    // performs 4 divisions
+    for (int i = 14; i >= 10; i--) {
+        if (res >> i&1) {
+            res ^= gen << (i - 10);
+        }
     }
     // mask it (xor) with 101010000010010 (ie : 21522 in integer form (qr specification))
-    return (num | res) ^ 21522;
+    return (msg << 10 | res) ^ 0x5412; // 0x5412 => 21522
 }
-
-bool set_mask(int level, int x, int y) {
-    switch(level) {
-        case 0 : return	(y + x) % 2 == 0;
-        case 1 : return	(y) % 2 == 0;
-        case 2 : return (x) % 3 == 0;
-        case 3 : return (y + x) % 3 == 0;
-        case 4 : return ( (y / 2) + (x / 3) ) % 2 == 0;
-        case 5 : return ((y * x) % 2) + ((y * x) % 3) == 0;
-        case 6 : return ( ((y * x) % 2) + ((y * x) % 3) ) % 2 == 0;
-        case 7 : return ( ((y + x) % 2) + ((y * x) % 3) ) % 2 == 0;
-        default : return 0;
-    }
-}
-
 std::string encode (const std::string &msg, int mode) {
     std::string bits;
 
@@ -197,7 +200,7 @@ int evaluate(const std::vector<std::vector<int>> &grid) {
 
     return maxv;
 }
-int get_mask(std::vector<std::vector<int>> grid) {
+int mk_mask(std::vector<std::vector<int>> grid) {
 
     const auto path = grid_pos(grid);
     int maxv = 9999, mask = 0;
@@ -243,7 +246,7 @@ std::vector<std::vector<int>> qr_write (const std::string &msg, int ecc) { // up
     cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n";
     cout << "Ecc mode   : " << Infos::ECC(ecc) << "\n";
     cout << "Ecc blocks : " << nb << "\n";
-
+    cout << "ndata blocks : " << nb << "\n";
     auto grid = mk_grid(version);
     const auto path = grid_pos(grid);
     const auto info = info_pos(17 + version * 4);
@@ -277,13 +280,14 @@ std::vector<std::vector<int>> qr_write (const std::string &msg, int ecc) { // up
         }
     }
 
+    cout << "binary size : " << bits.size() << "\n\n";
     // write bits on the grid
     for (int i = 0; i < path.size(); i++) {
         auto &[x,y] = path[i];
         grid[y][x] = (i < bits.size()) ? bits[i] - 48 : 0 ;
     }
 
-    int mask = get_mask(grid);
+    int mask = mk_mask(grid);
 
     cout << "Mask       : " << mask << "\n";
 
@@ -332,7 +336,7 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version
         cout << "The format information has no errors\n";
     }
 
-    const int ecc = bin2int(format[0].substr(0,2)) ^ 3;
+    const int ecc = bin2int(format[0].substr(0,2)) ^ 2;
     const int mask = bin2int(format[0].substr(2,3)) ^ 5;
 
     const int ndata = codewords[ecc][version]; // total of data codewords
@@ -342,24 +346,27 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version
 
     cout << "Mask       : " << mask << "\n";
     cout << "Ecc mode   : " << Infos::ECC(ecc) << "\n\n";
+    cout << "Ecc blocks : " << nb << "\n";
 
     // read qr code
     for (auto &[x,y] : grid_pos(mk_grid(version))) {
         src += (set_mask(mask, x, y) ^ qr[y][x]) + '0';
     }
+    // cout << "size : " << src.size() << "\n";
     // reed-solomon decoding :
     // [              block 1            ][              block ...           ]
     // [[data polynomial][ecc polynomial]] [[data polynomial][ecc polynomial]]
-    for (int block = 0; block < nb; block++) {
-        std::string sub1 = src.substr(block * dc * 8, dc * 8); // binary data block
-        std::string sub2 = src.substr(ndata * 8 + block * ec * 8, ec * 8); // binary ecc block
 
-        cout << "ecc block " << block;
+    for (int block = 0; block < nb; block++) {
+        const std::string sub1 = src.substr(block * dc * 8, dc * 8); // binary data block
+        const std::string sub2 = src.substr(ndata * 8 + block * ec * 8, ec * 8); // binary ecc block
+
+        cout << "ecc block " << block ;
         polynomial code(get_bits2(sub1 + sub2, dc + ec));
         polynomial reed = rs_decode(code, ec);
-        // cout << show::simplified(poly)  << "\n";
-        // cout << show::simplified(eccc) ;
-        // cout << "\n";
+
+        cout << show::simplified(reed) << "\n\n" ;
+
         for (int i = 0; i < dc; i++) {
             bits += std::bitset<8>(reed[i]).to_string();
         }
@@ -369,7 +376,6 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version
     const int nbit = get_len(version, mode); // the message size is inscribed in the 8th, 9th or 10th following bits (depending of the version and te mode)
     const int mlen = bin2int(bits.substr(4, nbit));
 
-    cout << "\n";
     cout << "Mode       : " << Infos::mode(mode) << "\n";
     cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n";
 
