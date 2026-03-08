@@ -1,6 +1,21 @@
 #include <algorithm>
 #include "gf256.hpp"
 
+namespace bit {
+    bool chk (uint64_t num, uint64_t ix) { return num >> ix &1ull; }
+    uint64_t set (uint64_t num, uint64_t ix) { return num | 1ull << ix; }
+    uint64_t tog (uint64_t num, uint64_t ix) { return num ^ 1ull << ix; }
+    uint64_t clr (uint64_t num, uint64_t ix) { return num & ~(1ull << ix); }
+
+    uint64_t cnt (uint64_t num) {
+        uint64_t cnt = 0;
+
+        do { cnt += num &1; } while (num >>= 1);
+
+        return cnt;
+    }
+};
+
 std::string int2bin (const std::vector<u8> &v) {
     std::string bin;
     for (auto &it : v) bin += std::bitset<8>(it).to_string();
@@ -28,6 +43,85 @@ int bin2int(const std::string &src) { return stoi(src, nullptr, 2); }
 //
 //     return syn;
 // }
+
+int shift (int codewords, int generator, int ec, int dc) {
+    for (int i = dc - 1; i >= 0; i--) {
+        if (codewords >> (i + (ec - dc)) & 1) {
+            codewords ^= generator << i;
+        }
+    }
+    return codewords;
+}
+
+///////////////////////////////// BHC code /////////////////////////////////////
+int gen_format_info (int ecc, int mask) {
+    // (15,5) BCH code for t = 3 Suitable for hardware-style or embedded implementations
+    // generate the information error code
+    // standard narrow-sense primitive BCH over GF(2) generator polynomial
+    // g(x) = x^10 + x^8 + x^5 + x^4 + x^2 + x + 1 (binary : 10100110111 integer : 1335 hex : 0x537)
+
+    // (Bose–Chaudhuri–Hocquenghem code) [5 bits][     10 bits    ]
+    // the qr format info is in the form [ info ][error correction]
+    // [ecc (2 bits) | mask (3 bits)][ BCH code (10 bits) ]
+
+    // gen : 01010 0110111000 ( polynomial padded to match the information size (ie : 15 bits))
+    // num : 01100 0000000000 (ex for ecc 1 and mask 4 -> [01100][00000 00000])
+    // For decoding (syndrome computation + Berlekamp–Massey), additional GF(16) arithmetic is required
+    const int data_bits = ((ecc << 3) | mask) << 10;
+    const int codewords = shift(data_bits, 0x537, 15, 5);
+    // mask it (xor) with 101010000010010 (integer : 21522 hex :  0x5412)
+    return (data_bits | codewords) ^ 0x5412;
+}
+int dec_format_info (int data) {
+    // BHC error correction
+    // Only because we have only 32 possible codes (ie : 2^5), sophisticated algorithms
+    // such as Berlekamp-Massey for decoding BCH codes would be overkill in this case.
+    // it's much easier to simply try each one and pick the one with the smallest distance.
+    int form = -1, maxv = 15;
+
+    for (int test = 0; test < 32; test++) {
+        const int code = (test << 10) ^ shift(test << 10, 0x537, 15, 5);
+        const int dist = bit::cnt(data ^ code);
+
+        if (dist < maxv) {
+            maxv = dist;
+            form = test;
+        } else if (dist == maxv) { // if there is more than one possibility ?
+            form = -1;
+        }
+    }
+
+    return form;
+}
+
+//////////////////////////////// golay code ////////////////////////////////////
+int gen_golay_code (int version) {
+    // golay error code [6 bits ][ 12 bits             ]
+    // version string :[version][error correction code]
+    // g(x) : x^12 + x^11 + x^10 + x^9 + x^8 + x^5 + x^2 + 1 (binary : 1111100100101 integer : 7973 hex : 0x1f25)
+    const int data_bits = version << 12;
+    return data_bits | shift(data_bits, 0x1f25, 18, 6);
+}
+int dec_golay_code(int data) {
+    int maxv = 18, vers = -1;
+
+    for (int test = 0; test < 64; test++) {
+        const int code = (test << 12) ^ shift(test << 12, 0x1f25, 18, 6);
+        const int dist = bit::cnt(data ^ code);
+
+        if (dist < maxv) {
+            maxv = dist;
+            vers = test;
+        } else if (dist == maxv) { // if there is more than one possibility ?
+            vers = -1;
+        }
+    }
+
+    return vers;
+}
+
+////////////////////////////////// RS code /////////////////////////////////////
+
 polynomial get_bits2 (const std::string &bits, int total) {
     polynomial p(total);
 
@@ -38,7 +132,7 @@ polynomial get_bits2 (const std::string &bits, int total) {
 }
 polynomial generator2 (int degree) {
     polynomial poly = {1};
-
+    // Generate an irreducible generator polynomial
     for (int i = 0; i < degree; i++) {
         poly = gf256::mul(poly, polynomial({1, gf256::EXP[i]}));
     }
@@ -145,14 +239,15 @@ polynomial correct (polynomial blocks, const polynomial &syn, const polynomial &
 }
 
 polynomial rs_encode (const polynomial &data, int degree) {
+    if ((data.size() + degree) > 255) return {}; // msg too long : max size 255
     const int dc = data.size() - degree;
     const polynomial gen = generator2(degree);
     polynomial edc = data;
     // cout << show::poly(gen) << "\n";
     for (int i = 0; i < dc; i++) {
-        u8 ch = edc[i];
+        u8 coef = edc[i];
         for (int j = 0; j < gen.size(); j++) {
-            edc[i + j] ^= gf256::mul(gen[j], ch);
+            edc[i + j] ^= gf256::mul(gen[j], coef);
         }
     }
 
@@ -199,29 +294,6 @@ polynomial rs_decode (const polynomial &data, int degree) {
     return correct(data, synd, errors);
 }
 
-// std::vector<u8> bitstobyte (const std::string &bits, int start, int end) {
-//     std::vector<u8> v;
-//     for (int i = start; i < end; i += 8) {
-//         v.push_back(stoi(bits.substr(i, 8), nullptr, 2));
-//     }
-//     return v;
-// }
-// int btoi (const std::vector<int> &bin, int st, int nd) {
-//     int num = 0;
-//     for (int i = 0; i < nd; i++) num |= bin[i + st] << i;
-//     return num;
-// }
-// int btoi (const std::string &bin, int st, int nd) {
-//     return stoi(bin.substr(st, nd), nullptr, 2);
-// }
-// polynomial get_bits (const std::string &bits, int total) {
-//     polynomial p(total);
-//
-//     for (int i = 0, index = total - 1; i < bits.size(); i += 8, index--) {
-//         p[index] = stoi(bits.substr(i, 8), nullptr,2);
-//     }
-//     return p;
-// }
 // polynomial getEDC(const std::string &bits, int total) {
 //     const int ec = total - bits.size() / 8;
 //     const polynomial gen = gf256::generator(ec);

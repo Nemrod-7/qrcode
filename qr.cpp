@@ -13,8 +13,8 @@ using namespace std;
     ECI encoding and decoding
     FNC1 encoding and decoding
     KANJI encoding and decoding
-    Version information Golay code encoding and decoding
-    Format information decoding
+    Version information Golay code encoding and decoding => done
+    Format information decoding => done
 */
 
 std::vector<int> getbyte (std::string bits, int st, int nd, int nbits) {
@@ -73,8 +73,13 @@ int get_version (const std::vector<std::vector<int>> &qr) {
     }
     // Golay Error Detection And Correction Code
     if (byte[0] != byte[1]) {
-        // todo implement the correction algorithm
-        cout << "\ninformation data corrupted.\n";
+        int a = dec_golay_code(byte[0]);
+        int b = dec_golay_code(byte[1]);
+
+        if (a != b) {
+            cout << "\ninformation data corrupted.\n";
+            return -1;
+        }
     }
 
     for (int i = 0; i < 41; i++) {
@@ -82,34 +87,9 @@ int get_version (const std::vector<std::vector<int>> &qr) {
             return i;
         }
     }
-    return 0;
+    return -1;
 }
 
-
-int gen_format_info (int ecc, int mask) { // (15,5) BCH code for t = 3 Suitable for hardware-style or embedded implementations
-    // generate the information error code
-    // standard narrow-sense primitive BCH over GF(2) generator polynomial
-    // g(x) = x^10 + x^8 + x^5 + x^4 + x^2 + x + 1 (binary : 10100110111 integer : 1335 hex : 0x537)
-
-    // (Bose–Chaudhuri–Hocquenghem code) [5 bits][     10 bits    ]
-    // the qr format info is in the form [ info ][error correction]
-    // [ecc (2 bits) | mask (3 bits)][ BCH code (10 bits) ]
-
-    // gen : 01010 0110111000 ( polynomial padded to match the information size (ie : 15 bits))
-    // num : 01100 0000000000 (ex for ecc 1 and mask 4 -> [01100][00000 00000])
-    // For decoding (syndrome computation + Berlekamp–Massey), additional GF(16) arithmetic is required
-    const int msg = ((ecc << 3) | mask);
-    int gen = 0x537; // "10100110111000";
-    int res = msg << 10;
-    // performs 4 divisions
-    for (int i = 14; i >= 10; i--) {
-        if (res >> i&1) {
-            res ^= gen << (i - 10);
-        }
-    }
-    // mask it (xor) with 101010000010010 (ie : 21522 in integer form (qr specification))
-    return (msg << 10 | res) ^ 0x5412; // 0x5412 => 21522
-}
 std::string encode (const std::string &msg, int mode) {
     std::string bits;
 
@@ -314,6 +294,10 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version
     if (version == 0) return "";
     if (version >= 7) {
         int version_to_check = get_version(qr);
+        
+        if (version_to_check == -1) {
+            cout << "error reading version information.\n";
+        }
     }
 
     const auto info = info_pos(qr.size());
@@ -329,9 +313,16 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version
         format[i % 2] += qr[x][y] + '0';
     }
 
+
     if (format[0] != format[1]) {
-        cout << "The format information contains errors\n";
-        // todo -> implement ecc check for format informations
+        const int a = dec_format_info(bin2int(format[0]));
+        const int b = dec_format_info(bin2int(format[1]));
+        cout << "The format information contains errors.\n";
+
+        if (a != b) {
+            cout << "can't decode qr : too much damage.\n";
+            return "";
+        }
     } else {
         cout << "The format information has no errors\n";
     }
@@ -357,6 +348,9 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version
     // [              block 1            ][              block ...           ]
     // [[data polynomial][ecc polynomial]] [[data polynomial][ecc polynomial]]
 
+    // cout << ndata  + nb << " " << grid_pos(mk_grid(version)).size() / 8 << "\n";
+
+
     for (int block = 0; block < nb; block++) {
         const std::string sub1 = src.substr(block * dc * 8, dc * 8); // binary data block
         const std::string sub2 = src.substr(ndata * 8 + block * ec * 8, ec * 8); // binary ecc block
@@ -365,7 +359,12 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version
         polynomial code(get_bits2(sub1 + sub2, dc + ec));
         polynomial reed = rs_decode(code, ec);
 
-        cout << show::simplified(reed) << "\n\n" ;
+        if (reed.size() == 0)  {
+            cout << "can't decode qr : too much damage.\n";
+            return "";
+        }
+        // cout << show::simplified(code) << "\n\n" ;
+        // cout << show::simplified(reed) << "\n\n" ;
 
         for (int i = 0; i < dc; i++) {
             bits += std::bitset<8>(reed[i]).to_string();
