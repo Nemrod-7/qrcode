@@ -7,4 +7,4 @@ DEBUG: pause: False
 DEBUG: repl: python
 DEBUG: args: ['/home/nemrod7/code/qrcode/hamming.cpp']
 INFO: return code: 1 (0x1)
-INFO: elapsed time: 0.056438
+INFO: elapsed time: 0.048619

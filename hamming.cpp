@@ -1,7 +1,6 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <bitset>
 
 using namespace std;
 
@@ -72,95 +71,9 @@ std::string correct(int m, int n, std::string bits) { // correct a M x N byte
 }
 
 namespace hamming {
-    // hamming code (7 4) : total of 7 bits for 4 bits of data
-    int encode1 (int data) {
-        const bool kernel[4][7] = {
-            {1,1,1,0,0,0,1}, {1,1,0,0,0,1,0}, {1,0,1,0,1,0,0}, {0,1,1,1,0,0,0},
-        };
-        int code = 0;
-
-        for (int j = 0; j < 7; j++) {
-            // bool par = 0;
-            for (int i = 0; i < 4; i++) {
-                // bool bit = ((data >> i) & 1);
-                // par ^= bit & kernel[i][j];
-                code ^= (((data >> i) & 1) & kernel[i][j]) << (6 - j);
-                // printf("(%i x %i) ", bit, kernel[i][j]);
-            }
-            // printf(" = %i\n", par);
-        }
-
-        return code;
-    }
-    int encode2 (int data) {
-        const bool d1 = (data >> 3 & 1);
-        const bool d2 = (data >> 2 & 1);
-        const bool d3 = (data >> 1 & 1);
-        const bool d4 = (data >> 0 & 1);
-        int par = 0;
-
-        par |= (d2 ^ d3 ^ d4) << 6;
-        par |= (d1 ^ d3 ^ d4) << 5;
-        par |= (d1 ^ d2 ^ d4) << 4;
-
-        return par | data;
-    }
-
-    int decode1 (int byte) {
-
-        bool chk[3][7] = {
-            {1, 0, 1, 1,  1, 0, 0},
-            {1, 1, 0, 1,  0, 1, 0},
-            {1, 1, 1, 0,  0, 0, 1}
-        };
-
-        for (int k = 0; k < 7; k++) {
-            const int data = byte ^ (1 << k); // just modify 1 bit
-            int synd = 0;
-
-            for (int i = 0; i < 3; i++) {
-                for (int j = 0; j < 7; j++) {
-                    bool bit = ((data >> j) & 1);
-                    synd ^= (bit & chk[i][j]) << i;
-                    // printf("(%i %i) ", chk[i][j], bit);
-                }
-                // printf("\n");
-            }
-            if (synd == 0) return data;
-            // printf(" : %i", pary);
-            // printf("\n");
-        }
-        return 0;
-    }
-    int decode2 (int input) {
-        const int d1 = (input >> 3 & 1);
-        const int d2 = (input >> 2 & 1);
-        const int d3 = (input >> 1 & 1);
-        const int d4 = (input >> 0 & 1);
-        const int par = input >> 4;
-
-        const int p1 = (d2 ^ d3 ^ d4) << 2;
-        const int p2 = (d1 ^ d3 ^ d4) << 1;
-        const int p3 = (d1 ^ d2 ^ d4) << 0;
-        const int syn = p1 | p2 | p3;
-
-        switch (par ^ syn)  {
-            case 1 : input ^= 1 << 4; break;
-            case 2 : input ^= 1 << 5; break;
-            case 3 : input ^= 1 << 3; break;
-            case 4 : input ^= 1 << 6; break;
-            case 5 : input ^= 1 << 2; break;
-            case 6 : input ^= 1 << 1; break;
-            case 7 : input ^= 1 << 0; break;
-        }
-
-        return input;
-    }
-}
-
-int main() {
     /*
-       hamming code (7 4)
+       hamming code (7 4) : total of 7 bits for 4 bits of data
+
        |d1 d2 d3 d4|
        |1 0 1 0|
        .
@@ -178,36 +91,134 @@ int main() {
        | | +---------->(1 × 1) + (0 × 1) + (1 × 0) + (0 × 1)
        | +------------>(1 × 1) + (0 × 0) + (1 × 1) + (0 × 1)
        +-------------->(1 × 0) + (0 × 1) + (1 × 1) + (0 × 1)
+
+
+       returns : p1 p2 d1 p3 d2 d3 d4
        */
+    int encode (int data) {
+      const bool d1 = ((data >> 3) & 1);
+      const bool d2 = ((data >> 2) & 1);
+      const bool d3 = ((data >> 1) & 1);
+      const bool d4 = ((data >> 0) & 1);
+      int block = d4 | (d3 << 1) | (d2 << 2) | (d1 << 4);
+
+      block |= (d2 ^ d3 ^ d4) << 6;
+      block |= (d1 ^ d3 ^ d4) << 5;
+      block |= (d1 ^ d2 ^ d4) << 3;
+
+      return block;
+    }
+    int decode (int data) {
+        const bool d1 = ((data >> 4) & 1);
+        const bool d2 = ((data >> 2) & 1);
+        const bool d3 = ((data >> 1) & 1);
+        const bool d4 = ((data >> 0) & 1);
+        const int par = ((data >> 5) << 1) | ((data >> 3) & 1) ;
+        const int syn = (d1 ^ d2 ^ d4) | ((d1 ^ d3 ^ d4) << 1) | ((d2 ^ d3 ^ d4) << 2);
+
+        switch (par ^ syn)  {
+            case 1 : data ^= 1 << 4; break;
+            case 2 : data ^= 1 << 5; break;
+            case 3 : data ^= 1 << 3; break;
+            case 4 : data ^= 1 << 6; break;
+            case 5 : data ^= 1 << 2; break;
+            case 6 : data ^= 1 << 1; break;
+            case 7 : data ^= 1 << 0; break;
+        }
+
+        return (d4 | (d3 << 1) | (d2 << 2) | (d1 << 3));
+    }
+    // int encode1 (int data) {
+    //     const bool kernel[4][7] = {
+    //         {1,1,1,0,0,0,1},
+    //         {1,1,0,0,0,1,0},
+    //         {1,0,1,0,1,0,0},
+    //         {0,1,1,1,0,0,0},
+    //     };
+    //     int code = 0;
+    //     int cod2 = 0;
+    //     const int ker2[7] = {
+    //       0b1110, 0b1101, 0b1011, 0b0001, 0b0010, 0b100, 0b1000
+    //     };
+    //
+    //     const int ker3[4] {
+    //       0b1000111,
+    //       0b0100011,
+    //       0b0010101,
+    //       0b0001110,
+    //     };
+    //
+    //     for (int i = 0; i < 4; i++) {
+    //         cod2 ^= data & ker3[i];
+    //         printf("%b %b\n", cod2, ker3);
+    //     }
+    //
+    //     for (int j = 0; j < 7; j++) {
+    //         // bool par = 0;
+    //         for (int i = 0; i < 4; i++) {
+    //             // bool bit = ((data >> i) & 1);
+    //             // par ^= bit & kernel[i][j];
+    //             code ^= (((data >> i) & 1) & kernel[i][j]) << (6 - j);
+    //             // printf("(%i x %i) ", bit, kernel[i][j]);
+    //         }
+    //         // printf(" = %i\n", par);
+    //     }
+    //     // printf("%b %i\n", code, code);
+    //     // printf("%b %i\n", cod2, cod2);
+    //     return code;
+    // }
+
+    // int decode1 (int byte) {
+    //
+    //     bool chk[3][7] = {
+    //         {1, 0, 1, 1,  1, 0, 0},
+    //         {1, 1, 0, 1,  0, 1, 0},
+    //         {1, 1, 1, 0,  0, 0, 1}
+    //     };
+    //
+    //     for (int k = 0; k < 7; k++) {
+    //         const int data = byte ^ (1 << k); // just modify 1 bit
+    //         int synd = 0;
+    //
+    //         for (int i = 0; i < 3; i++) {
+    //             for (int j = 0; j < 7; j++) {
+    //                 bool bit = ((data >> j) & 1);
+    //                 synd ^= (bit & chk[i][j]) << i;
+    //                 // printf("(%i %i) ", chk[i][j], bit);
+    //             }
+    //             // printf("\n");
+    //         }
+    //         if (synd == 0) return data;
+    //         // printf(" : %i", pary);
+    //         // printf("\n");
+    //     }
+    //     return 0;
+    // }
+
+}
+
+int main() {
+
     cout << "\n\n\n";
 
+    int order = 256;
+    int field[order];
     const int n = 2;
     const int total = (1 << n) - 1;
     const int ndata = total - n ;
 
-    vector<int> d(total), p(total - ndata);
+    const int prim = 0b1011;
+    const int genr = 0b10;
+    int exp = 1;
+    int max = 1 << 5;
 
-    for (int i = 2; i < 10; i++) {
-        int total = (1 << i) - 1;
-        int ndata = total - i ;
-
-        printf("%i %i %i\n",i,  total, ndata);
+    for (int i = 1; i < 16; i++) {
+      if (exp >= 8) exp ^= prim;
+      field[i] = exp;
+      printf("%05b %i\n", exp, exp);
+      exp <<= 1;
     }
 
-    // for (int j = 0; j < n - 1; j++) {
-    //     for (int i = 0; i < n; i++) {
-    //         if (j != i) p[j] ^= d[i];
-    //     }
-    // }
-
-    // cout << bitset<7>(code);
-    // for (int i = 6; i > 3; i--) {
-    //   printf("%i %i\n", (byte >>i & 1), p[6 - i]);
-    // }
-
-    // string msg = "1010011001000111011000011000110001";
-    // correct(4,6, msg);
-    // correct(2,3, "11011010001");
 
 
 }

@@ -294,7 +294,7 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version
     if (version == 0) return "";
     if (version >= 7) {
         int version_to_check = get_version(qr);
-        
+
         if (version_to_check == -1) {
             cout << "error reading version information.\n";
         }
