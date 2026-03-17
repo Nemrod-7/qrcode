@@ -17,7 +17,7 @@ const std::vector<int> versinfo = {
   136944,141498,145311,150283,152622,158308,161089,167017
 };
 
-void finder( std::vector<std::vector<int>>&grid, int x, int y) {
+void finder( std::vector<std::vector<int>> &grid, int x, int y) {
     for (int i = -3; i <= 3; i++) {
         for (int j = -3; j <= 3; j++) {
             const int dist = std::max(std::abs(i), std::abs(j)); // Chebyshev distance
@@ -25,7 +25,7 @@ void finder( std::vector<std::vector<int>>&grid, int x, int y) {
         }
     }
 }
-void align ( std::vector<std::vector<int>>&grid, int x, int y) {
+void align ( std::vector<std::vector<int>> &grid, int x, int y) {
     for (int i = -2; i <= 2; i++) {
         for (int j = -2; j <= 2; j++) {
             const int dist = std::max(std::abs(i), std::abs(j)); // Chebyshev distance
