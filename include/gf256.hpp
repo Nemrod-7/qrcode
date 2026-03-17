@@ -1,7 +1,9 @@
+#pragma once
 
 #include <string>
 #include <cstdint>
 #include <vector>
+#include <bitset>
 
 using u8 = uint8_t;
 using polynomial = std::vector<u8>;

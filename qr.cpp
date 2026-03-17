@@ -3,9 +3,10 @@
 #include <bitset>
 #include <algorithm>
 
-#include "qr.hpp"
-#include "rs.hpp"
-#include "grid.hpp"
+#include "include/qr.hpp"
+#include "include/rs.hpp"
+#include "include/grid.hpp"
+#include "include/utils.hpp"
 
 using namespace std;
 
@@ -303,7 +304,8 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version
     const auto info = info_pos(qr.size());
     std::string format[2];
     std::string txt, src, bits;
-
+    
+    /*
     cout << "\n\n---decoding---\n\n";
     cout << "Version    : " << version << "\n" << flush;
 
@@ -348,9 +350,6 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version
     // [              block 1            ][              block ...           ]
     // [[data polynomial][ecc polynomial]] [[data polynomial][ecc polynomial]]
 
-    // cout << ndata  + nb << " " << grid_pos(mk_grid(version)).size() / 8 << "\n";
-
-
     for (int block = 0; block < nb; block++) {
         const std::string sub1 = src.substr(block * dc * 8, dc * 8); // binary data block
         const std::string sub2 = src.substr(ndata * 8 + block * ec * 8, ec * 8); // binary ecc block
@@ -372,32 +371,41 @@ std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version
     }
 
     const int mode = bin2int(bits.substr(0, 4)); // the message mode is inscribed in the first 4 bits
-    const int nbit = get_len(version, mode); // the message size is inscribed in the 8th, 9th or 10th following bits (depending of the version and te mode)
-    const int mlen = bin2int(bits.substr(4, nbit));
+    // const int nbit = get_len(version, mode); // the message size is inscribed in the 8th, 9th or 10th following bits (depending of the version and te mode)
+    // const int mlen = bin2int(bits.substr(4, nbit));
 
     cout << "Mode       : " << Infos::mode(mode) << "\n";
     cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n";
 
     bits = bits.substr(4 + nbit);
     txt = decode(bits, mode, mlen);
-
-    cout << "[" << txt << "]\n";
+    */
+    // cout << "[" << txt << "]\n";
     return txt;
 }
-
-int main () {
-
-
-    cout << "\n\n\n";
-    std::string msg = "https://jbirnick.github.io/";
-    // msg = "https://qrcode.com/";
-    // const std::string msg = "Hello, world! 123";
-    // msg = "Hi";
-    auto qr = qr_write(msg, H);
-    std::string txt = qr_read(qr);
-
-    // cout << Infos::grid(qr);
-
-    // cout << "[" << txt << "]\n";
-    cout  << "\nexit\n";
-}
+//
+// int main () {
+//
+//     // ...
+//     // Step 5: Apply threshold
+//     // Step 6: Detect border
+//     // Step 7: Get cell size and rescale  
+//     // Step 8: Find patterns and rotate qr
+//
+//
+//     cout << "\n\n\n";
+//     // std::string msg = "https://jbirnick.github.io/";
+//     // msg = "https://qrcode.com/";
+//     // auto qr = qr_write(msg, H);
+//     // std::string txt = qr_read(qr);
+//
+//     Image pic;
+//     pic = Image::from_file ("pictures/ys2XE.pgm");
+//     pic = simpl_thresh(pic);
+//     std::vector<std::vector<int>> qr = detect(pic);
+//
+//     // cout << Infos::grid(qr);
+//
+//     // cout << "[" << txt << "]\n";
+//     cout  << "\nexit\n";
+// }

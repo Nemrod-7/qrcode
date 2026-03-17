@@ -1,4 +1,6 @@
+#pragma once
 #include <vector>
+
 
 const std::vector<std::vector<int>> placement = {
 {}, {},

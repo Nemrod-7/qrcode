@@ -1,3 +1,5 @@
+#pragma once
+
 #include <algorithm>
 #include "gf256.hpp"
 
