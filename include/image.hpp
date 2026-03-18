@@ -70,10 +70,8 @@ Image simpl_thresh (const Image &src) {
     img.pixels = src.pixels;
 
     for (auto &it : img.pixels) {
-        light = std::max (it, light);
-        dark = std::min (it, dark);
-
-
+        light = std::min (it, light);
+        dark = std::max (it, dark);
     }
     u8 thre = (dark + light) * 0.5;
 
