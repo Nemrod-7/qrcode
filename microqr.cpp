@@ -3,25 +3,9 @@
 #include <vector>
 
 #include "include/grid.hpp"
+#include "include/rs.hpp"
 
 using namespace std;
-
-namespace bit {
-    bool chk (uint64_t num, uint64_t ix) { return num >> ix &1ull; }
-    uint64_t set (uint64_t num, uint64_t ix) { return num | 1ull << ix; }
-    uint64_t tog (uint64_t num, uint64_t ix) { return num ^ 1ull << ix; }
-    uint64_t clr (uint64_t num, uint64_t ix) { return num & ~(1ull << ix); }
-
-    uint64_t cnt (uint64_t num) {
-        uint64_t cnt = 0;
-
-        do { cnt += num &1; } while (num >>= 1);
-
-        return cnt;
-    }
-
-};
-
 
 static std::string grid (const std::vector<std::vector<int>> &grid) {
     std::string os;
@@ -49,6 +33,87 @@ std::vector<std::vector<int>> micro_qr (int version) { // M1, M2, M3, M4
 
     return grid;
 }
+std::vector<std::vector<int>> micro_write (const std::string &txt) {
+    int version = 1;
+    std::vector<std::vector<int>> qr = micro_qr(version);
+
+
+
+    return qr;
+}
+std::string micro_read (const std::vector<std::vector<int>> &qr) {
+   
+    const int version = (qr.size() - 11) / 2;
+    // const int size = qr.size();
+    std::cout << ":: decoding :: " << "\n"; 
+    std::cout << "   micro QR    " << "\n";
+    std::cout << "Version    : " << version << "\n" << std::flush;
+
+    std::string format[2];
+    std::string txt, src, bits;
+
+    // format information zone
+    for (int i = 0; i < 8; i++) {
+       format[0] += qr[8][i + 1] + '0';
+       format[1] += qr[i + 1][8] + '0'; 
+    }
+
+    if (format[0] != format[1]) {
+        const int a = dec_format_info(bin2int(format[0]));
+        const int b = dec_format_info(bin2int(format[1]));
+        std::cout << "The format information contains errors.\n";
+
+        if (a != b) {
+            std::cout << "can't decode qr : too much damage.\n";
+            return "";
+        }
+    } else {
+        std::cout << "The format information has no errors\n";
+    }
+
+    const int ecc = bin2int(format[0].substr(0,2)) ^ 2;
+    const int mask = bin2int(format[0].substr(2,3)) ^ 5;
+
+    std::cout << "Mask       : " << mask << "\n";
+    // std::cout << "Ecc mode   : " << Infos::ECC(ecc) << "\n\n";
+
+    // // read qr code
+    // for (auto &[x,y] : grid_pos(mk_grid(version))) {
+    //     src += (set_mask(mask, x, y) ^ qr[y][x]) + '0';
+    // }
+    
+    // const std::string sub1 = src.substr(dc * 8, dc * 8); // binary data block
+    // const std::string sub2 = src.substr(ndata * 8 + ec * 8, ec * 8); // binary ecc block
+    //
+    // std::cout << "Decoding ecc block " ;
+    // polynomial code(get_bits2(sub1 + sub2, dc + ec));
+    // polynomial reed = rs_decode(code, ec);
+    //
+    // if (reed.size() == 0)  {
+    //     std::cout << "can't decode qr : too much damage.\n";
+    //     return "";
+    // }
+    // // std::cout << show::simplified(code) << "\n\n" ;
+    // // std::cout << show::simplified(reed) << "\n\n" ;
+    //
+    // for (int i = 0; i < dc; i++) {
+    //     bits += std::bitset<8>(reed[i]).to_string();
+    // }
+    //
+    // const int mode = bin2int(bits.substr(0, 4)); // the message mode is inscribed in the first 4 bits
+    // const int nbit = get_len(version, mode); // the message size is inscribed in the 8th, 9th or 10th following bits (depending of the version and te mode)
+    // const int mlen = bin2int(bits.substr(4, nbit));
+    //
+    // std::cout << "Mode       : " << Infos::mode(mode) << "\n";
+    // std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n\n";
+    //
+    // bits = bits.substr(4 + nbit);
+    //
+    // return decode(bits, mode, mlen);
+
+    return "";
+}
+
 
 int main () {
     cout << "\n\n\n";
@@ -77,9 +142,12 @@ int main () {
         }
     }
 
-    // for (int i = 0; i < 4; i++) {
-    //     cout << grid(micro_qr(i)) << "\n";
-    // }
+    for (int i = 0; i < 1; i++) {
+        auto qr = micro_qr(i);
+
+        micro_read(qr);
+
+    }
 
 
 }

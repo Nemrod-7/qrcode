@@ -6,6 +6,7 @@
 #include "include/utils.hpp"
 #include "include/image.hpp"
 #include "include/qr.hpp"
+
 // using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -81,6 +82,7 @@ std::vector<std::vector<int>> to_vec (const Image &pic) { // place all qr data b
 }
 ////////////////////////////////////////////////////////////////////////////////
 
+
 int main() {
 
     Image pic;
@@ -92,6 +94,8 @@ int main() {
 
     std::vector<std::vector<int>> qr = to_vec(pic);
     // std::vector<std::vector<int>> qr  = rescale(pic);
+
+    std::cout << Infos::grid(qr);
 
     if (qr.size() < 20) {
         // Micro QR
@@ -111,9 +115,12 @@ int main() {
             qr = rotate(qr);
             index++;
         }
+
+        std::string txt = qr_read(qr);
+
+        std::cout << "text : [" << txt << "]";
     }
 
-    std::cout << Infos::grid(qr);
 
 
     std::cout << "\nend\n";

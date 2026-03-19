@@ -1,148 +1,416 @@
 #pragma once
 
-#include <string>
+#include <iostream>
+#include <vector>
+#include <bitset>
+#include <algorithm>
 
-// error correction level
-// L : tolerate 7 % of data loss
-// M : tolerate 15 % of data loss
-// Q : tolerate 25 % of data loss
-// H : tolerate 30 % of data loss
-//
-enum ECC {M, L, H, Q};
+#include "rs.hpp"
+#include "grid.hpp"
+#include "specs.hpp"
+#include "utils.hpp"
 
-enum MODE {END, NUMERIC, ALPHANUM, STRUCTURED, BYTE, FNC1, _6_, ECI, KANJI};
-// const int Mdb[4][2] = {{1, 4},{2, 6},{4, 8},{8, 16}};
-const std::string alnum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
+// using namespace std;
 
-const unsigned int padding[2] = {0xec, 0x11}; // bin: 11101100 00010001
-//                                         [         data codewords         ] [            ecc codewords             ]
-// the qr binary data is encoded like this [[[mode][data length][data][0000]] [ecc block 1][ecc block 2][ecc block...]
+/* to implement :
+    ECI encoding and decoding
+    FNC1 encoding and decoding
+    KANJI encoding and decoding
+    Version information Golay code encoding and decoding => done
+    Format information decoding => done
+*/
 
-// the message received (numeric, alphanumeric, byte or kanji) is encoded and the error correction code chosen determine the size needed and so the size of the grid.
-// this table is used just to determine the version of the qr code and nothing else. : capacity[version][mode][ecc] -> maximum of encoded [data] codewords allowed .
-//           0 -> 1              1 -> 2                    2 -> 4                         3 -> 8
-// END,     NUMERIC,            ALPHANUM,   STRUCTURED,     BYTE,      FNC1,_6_,ECI,       KANJI
-//        M   L  H   Q         M   L    H    Q          M    L   H    Q                 M   L   H    Q
-unsigned capacity[23][9][4] = {
-{{},{                   },{                   },{},{                   },{},{},{},{                   }},
-{{},{  34,  41,  17,  27},{  20,  25,  10,  16},{},{  14,  17,   7,  11},{},{},{},{   8,  10,   4,   7}},
-{{},{  63,  77,  34,  48},{  38,  47,  20,  29},{},{  26,  32,  14,  20},{},{},{},{  16,  20,   8,  12}},
-{{},{ 101, 127,  58,  77},{  61,  77,  35,  47},{},{  42,  53,  24,  32},{},{},{},{  26,  32,  15,  20}},
-{{},{ 149, 187,  82, 111},{  90, 114,  50,  67},{},{  62,  78,  34,  46},{},{},{},{  38,  48,  21,  28}},
-{{},{ 202, 255, 106, 144},{ 122, 154,  64,  87},{},{  84, 106,  44,  60},{},{},{},{  52,  65,  27,  37}},
-{{},{ 255, 322, 139, 178},{ 154, 195,  84, 108},{},{ 106, 134,  58,  74},{},{},{},{  65,  82,  36,  45}},
-{{},{ 293, 370, 154, 207},{ 178, 224,  93, 125},{},{ 122, 154,  64,  86},{},{},{},{  75,  95,  39,  53}},
-{{},{ 365, 461, 202, 259},{ 221, 279, 122, 157},{},{ 152, 192,  84, 108},{},{},{},{  93, 118,  52,  66}},
-{{},{ 432, 552, 235, 312},{ 262, 335, 143, 189},{},{ 180, 230,  98, 130},{},{},{},{ 111, 141,  60,  80}},
-{{},{ 513, 652, 288, 364},{ 311, 395, 174, 221},{},{ 213, 271, 119, 151},{},{},{},{ 131, 167,  74,  93}},
-{{},{ 604, 772, 331, 427},{ 366, 468, 200, 259},{},{ 251, 321, 137, 177},{},{},{},{ 155, 198,  85, 109}},
-{{},{ 691, 883, 374, 489},{ 419, 535, 227, 296},{},{ 287, 367, 155, 203},{},{},{},{ 177, 226,  96, 125}},
-{{},{ 796,1022, 427, 580},{ 483, 619, 259, 352},{},{ 331, 425, 177, 241},{},{},{},{ 204, 262, 109, 149}},
-{{},{ 871,1101, 468, 621},{ 528, 667, 283, 376},{},{ 362, 458, 194, 258},{},{},{},{ 223, 282, 120, 159}},
-{{},{ 991,1250, 530, 703},{ 600, 758, 321, 426},{},{ 412, 520, 220, 292},{},{},{},{ 254, 320, 136, 180}},
-{{},{1082,1408, 602, 775},{ 656, 854, 365, 470},{},{ 450, 586, 250, 322},{},{},{},{ 277, 361, 154, 198}},
-{{},{1212,1548, 674, 876},{ 734, 938, 408, 531},{},{ 504, 644, 280, 364},{},{},{},{ 310, 397, 173, 224}},
-{{},{1346,1725, 746, 948},{ 816,1046, 452, 574},{},{ 560, 718, 310, 394},{},{},{},{ 345, 442, 191, 243}},
-{{},{1500,1903, 813,1063},{ 909,1153, 493, 644},{},{ 624, 792, 338, 442},{},{},{},{ 384, 488, 208, 272}},
-{{},{1600,2061, 919,1159},{ 970,1249, 557, 702},{},{ 666, 858, 382, 482},{},{},{},{ 410, 528, 235, 297}},
-{{},{1708,2232, 969,1224},{1035,1352, 587, 742},{},{ 711, 929, 403, 509},{},{},{},{ 438, 572, 248, 314}},
-{{},{1872,2409,1056,1358},{1134,1460, 640, 823},{},{ 779,1003, 439, 565},{},{},{},{ 480, 618, 270, 348}}};
+std::vector<int> getbyte (const std::string &bits, int st, int nd, int nbits) {
+    std::vector<int> v;
+    for (int i = st; i < nd; i += nbits) {
+        int ii = stoi(bits.substr(i, nbits), nullptr, 2);
+        v.push_back(ii);
+    }
+    return v;
+}
 
-//
-const unsigned int err_blocks [4][41] = { // err_blocks[ecc][version] -> number of [ecc blocks...].
-    //  Version: (note that index 0 is for padding, and is set to an illegal value)
-    //  1, 2, 3, 4, 5, 6, 7, 8, 9,10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40    Error correction level
-    {0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5,  5,  8,  9,  9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49},  // Medium
-    {0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4,  4,  4,  4,  4,  6,  6,  6,  6,  7,  8,  8,  9,  9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25},  // Low
-    {0, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81},  // High
-    {0, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8,  8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68},  // Quartile
-};
+bool set_mask(int level, int x, int y) {
+    switch(level) {
+        case 0 : return	(y + x) % 2 == 0;
+        case 1 : return	(y) % 2 == 0;
+        case 2 : return (x) % 3 == 0;
+        case 3 : return (y + x) % 3 == 0;
+        case 4 : return ( (y / 2) + (x / 3) ) % 2 == 0;
+        case 5 : return ((y * x) % 2) + ((y * x) % 3) == 0;
+        case 6 : return ( ((y * x) % 2) + ((y * x) % 3) ) % 2 == 0;
+        case 7 : return ( ((y + x) % 2) + ((y * x) % 3) ) % 2 == 0;
+        default : return 0;
+    }
+}
+int get_mode (const std::string &src) {
 
-// const int eccinfo[4][17] = {
-//   {0b1010001001,0b1110111110,0b0011100111,0b0111010000,0b1101100010,0b1001010101,0b0100001100,0b0000111011},
-//   {0b0101011111,0b0001101000,0b1100110001,0b1000000110,0b0010110100,0b0110000011,0b1011011010,0b1111101101},
-//   {0b0000010010,0b0100100101,0b1001111100,0b1101001011,0b0111111001,0b0011001110,0b1110010111,0b1010100000},
-//   {0b1111000100,0b1011110011,0b0110101010,0b0010011101,0b1000101111,0b1100011000,0b0001000001,0b0101110110},
-// };
+    enum MODE mode = NUMERIC;
 
-// codewords[ecc][version] -> number of [data codewords] for each version :
-//  M L H Q
-unsigned codewords[4][41] = {
-{   0,   16,   28,   44,   64,   86,  108,  124,  154,  182,  216,  254,  290,  334,  365,  415,  453,  507,  563,  627,  669,  714,  782,  860,  914, 1000, 1062, 1128, 1193, 1267, 1373, 1455, 1541, 1631, 1725, 1812, 1914, 1992, 2102, 2216, 2334}, // M
-{   0,   19,   34,   55,   80,  108,  136,  156,  194,  232,  274,  324,  370,  428,  461,  523,  589,  647,  721,  795,  861,  932, 1006, 1094, 1174, 1276, 1370, 1468, 1531, 1631, 1735, 1843, 1955, 2071, 2191, 2306, 2434, 2566, 2702, 2812, 2956}, // L
-{   0,    9,   16,   26,   36,   46,   60,   66,   86,  100,  122,  140,  158,  180,  197,  223,  253,  283,  313,  341,  385,  406,  442,  464,  514,  538,  596,  628,  661,  701,  745,  793,  845,  901,  961,  986, 1054, 1096, 1142, 1222, 1276}, // H
-{   0,   13,   22,   34,   48,   62,   76,   88,  110,  132,  154,  180,  206,  244,  261,  295,  325,  367,  397,  445,  485,  512,  568,  614,  664,  718,  754,  808,  871,  911,  985, 1033, 1115, 1171, 1231, 1286, 1354, 1426, 1502, 1582, 1666}, // Q
-};
+    for (auto &it : src) {
+        if (isdigit (it)) mode = std::max (mode, NUMERIC);//mode = max (mode , 1); // numeric
+        if (isupper (it)) mode = std::max (mode, ALPHANUM); // alphanumeric
+        if (islower (it)) mode = std::max (mode, BYTE); // byte
+        // if (iseci (it)) mode = max (mode, ECI); // ECI
+        // if (iskanji (it)) mode = max (mode, KANJI); // kanji
+    }
 
-//  ecsize[ecc][version] -> number of [ecc codwords] needed for each block.
-//  M L H Q
-unsigned ecsize[4][41] = {
-//0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40    Error correction level
-{0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28},  // Medium
-{0,  7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30},  // Low
-{0, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30},  // High
-{0, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30},  // Quartile
-};
+    return mode;
+}
+int get_len (int version, int mode) {
+    if (version < 10) {
+        return length_bits[0][mode];
+    } else if (version < 27) {
+        return length_bits[1][mode];
+    } else {
+        return length_bits[2][mode];
+    }
+}
+int get_version (const std::vector<std::vector<int>> &qr) {
+    int byte[2] = {0,0};
 
-// the number of bits necessary to record the size of the txt
-// depends of the version and the mode :
-//    N   AN    B        K
-const unsigned int length_bits[3][9] = {
-    {0,10, 9,0, 8,0,0,0, 8}, // version  1- 9
-    {0,12,11,0,16,0,0,0,10}, // version 10-26
-    {0,14,13,0,16,0,0,0,12}  // version 27-40
-};
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 6; j++) {
+            byte[0] |= qr[j][qr.size() - 11 + i] << (i + j * 3);
+            byte[1] |= qr[qr.size() - 11 + i][j] << (i + j * 3);
+        }
+    }
+    // Golay Error Detection And Correction Code
+    if (byte[0] != byte[1]) {
+        int a = dec_golay_code(byte[0]);
+        int b = dec_golay_code(byte[1]);
 
-// format information string [ecc -> L,M,Q,H][mask -> 0,1,2,3,4,5,6,7] precalulated mask and ecc
-const char information[4][8][16] = {
-  { "101010000010010", "101000100100101", "101111001111100", "101101101001011", "100010111111001", "100000011001110", "100111110010111", "100101010100000" }, // M
-  { "111011111000100", "111001011110011", "111110110101010", "111100010011101", "110011000101111", "110001100011000", "110110001000001", "110100101110110" }, // L
-  { "001011010001001", "001001110111110", "001110011100111", "001100111010000", "000011101100010", "000001001010101", "000110100001100", "000100000111011" }, // H
-  { "011010101011111", "011000001101000", "011111100110001", "011101000000110", "010010010110100", "010000110000011", "010111011011010", "010101111101101" }, // Q
-};
+        if (a != b) {
+            std::cout << "\ninformation data corrupted.\n";
+            return -1;
+        }
+    }
 
-class Infos {
-    public :
-        static std::string ECC (int level) {
-            switch(level) {
-                case L : return "Low"; break;
-                case M : return "Medium"; break;
-                case Q : return "Quartile"; break;
-                case H : return "High"; break;
-                default : return ""; break;
+    for (int i = 0; i < 41; i++) {
+        if (versinfo[i] == byte[0]) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+std::string encode (const std::string &msg, int mode) {
+    std::string bits;
+
+    if (mode == ECI) { // to do
+
+    } else if (mode == NUMERIC) {
+        std::string num = "   ";
+        for (int i = 0; i < msg.size(); i += 3) {
+            num[0] = msg[i+0];
+            num[1] = (i + 1) < msg.size() ? (msg[i+1]) : 0;
+            num[2] = (i + 2) < msg.size() ? (msg[i+2]) : 0;
+
+            switch(num.size()) {
+                case 1 : bits += std::bitset<4>(std::stoi(num)).to_string(); break;
+                case 2 : bits += std::bitset<2>(std::stoi(num)).to_string(); break;
+                case 3 : bits += std::bitset<10>(std::stoi(num)).to_string(); break;
             }
         }
-        static std::string mode (int mode) {
-            switch(mode) {
-                case ECI : return "ECI"; break;
-                case BYTE : return "BYTE"; break;
-                case FNC1 : return "FNC1"; break;
-                case KANJI : return "KANJI"; break;
-                case NUMERIC : return "NUMERIC"; break;
-                case ALPHANUM : return "ALPHANUM"; break;
-                case STRUCTURED : return "STRUCTURED"; break;
-                default : return ""; break;
-            }
+    } else if (mode == ALPHANUM) {
+        const int size = msg.size() % 2 == 0 ? msg.size() : msg.size() - 1;
+
+        for (int i = 0; i < size; i += 2) {
+            int i1 = alnum.find(msg[i+0]);
+            int i2 = alnum.find(msg[i+1]);
+            bits += std::bitset<11>(i1 * 45 + i2).to_string();
+        }
+        if (size % 2 != 1) bits += std::bitset<6>(alnum.find(msg.back())).to_string();
+    } else if (mode == BYTE) {
+        for (int i = 0; i < msg.size(); i++) {
+            bits += std::bitset<8>(msg[i]).to_string();
+        }
+    } else if (mode == KANJI) {
+
+    }
+
+    return bits;
+}
+std::string decode (const std::string &bits, int mode, int size) {
+    std::string txt;
+
+    if (mode == ECI) { // to do
+
+    } else if (mode == NUMERIC) {
+        for (auto &it : getbyte(bits, 0, (size * 10) / 3, 10)) {
+            txt += std::to_string(it);
+        }
+    } else if (mode == ALPHANUM) {
+        const int end = size / 2 * 11;
+
+        for (auto &it : getbyte(bits, 0, end, 11)) {
+            txt += alnum[it / 45];
+            txt += alnum[it % 45];
         }
 
-        static std::string grid (const std::vector<std::vector<int>> &grid) {
-            std::string os;
-            for (int i = 0; i < grid.size(); i++) {
-                for (int j = 0; j < grid.size(); j++) {
-                    os += (grid[i][j] == 0) ? ". " : "# ";
+        if (size % 2 != 0) {
+            int i1 = stoi(bits.substr(end , 6), nullptr, 2);
+            if (i1 < alnum.size()) txt += alnum[i1];
+        }
+    } else if (mode == BYTE) {
+        for (auto &it : getbyte(bits, 0, (size * 8) , 8)) {
+            txt += it;
+        }
+    }
+
+    return txt;
+}
+
+int evaluate(const std::vector<std::vector<int>> &grid) {
+    int maxv = 0;
+    int hor = 0, ver = 0;
+    // cout << Infos::grid(grid);
+    for (int i = 0; i < grid.size(); i++) {
+        for (int j = 0; j < grid.size(); j++) {
+            hor = (j > 0 && grid[i][j-1] != grid[i][j]) ? 0 : hor + 1;
+            ver = (j > 0 && grid[j - 1][i] != grid[j][i]) ? 0 : ver + 1;
+
+            if (hor > 5 || ver > 5) maxv += 1;
+            bool flag = true;
+
+            for (int l = 0; l < 2; l++) {
+                for (int k = 0; k < 2; k++) {
+                    if ((i + l) < grid.size() && (j + k) < grid.size()) {
+                        if (grid[i][j] != grid[i + l][j + k]) flag = false;
+                    }
                 }
-                os += '\n';
             }
-            return os;
+            // cout << flag << " ";
+            if (flag == true) maxv += 3;
         }
-        static std::string show (int ecc, int mode, int version) {
-            std::string os;
-            // std::cout << "codewords : " << ((capacity[version][mode][ecc] + 4) - msg.size()) << "\n";
-            os += "Ecc : " + Infos::ECC(ecc) + "\n";
-            os += "Mode : " + Infos::mode(mode) + "\n";
-            os += "Version : " + std::to_string(version) + "\n";
-            os += "Capacity : " + std::to_string(capacity[version][mode][ecc]) + "\n";
-            return os;
-            // std::cout << "data codewords : " << dc << " " << "error codewords : " << ec << "\n";
+
+    }
+
+    return maxv;
+}
+int mk_mask(const std::vector<std::vector<int>> &grid) {
+
+    const auto path = grid_pos(grid);
+    int maxv = 9999, mask = 0;
+
+    for (int i = 0; i < 8; i++) {
+        std::vector<std::vector<int>> copy = grid;
+
+        for (auto &[x,y] : path) {
+            copy[x][y] = copy[x][y] ^ set_mask(i, x, y);
         }
-};
+        int pts = evaluate(copy);
+
+        if (pts < maxv) {
+            maxv  = pts;
+            mask = i;
+        }
+    }
+
+    return mask;
+}
+
+std::vector<std::vector<int>> qr_write (const std::string &msg, int ecc) { // up to version 7
+
+    int version = 0;
+    const int mode = get_mode(msg); // 4 bits
+
+    while (true) {
+        if (capacity[version][mode][ecc] >= msg.size()) break;
+        else version++;
+    }
+
+    std::cout << "\n\n---encoding---\n\n";
+    std::cout << "Version    : " << version << "\n";
+    std::cout << "Mode       : " << Infos::mode(mode) << "\n";
+
+    if (version == 0) return {};
+
+    const int ndata = codewords[ecc][version]; // total of data codewords
+    const int ec = ecsize[ecc][version];   // number of ecc codewords by block
+    const int nb = err_blocks[ecc][version]; // number of ecc blocks
+    const int dc = ndata / nb;               // number of data codeword for each ecc block
+
+    std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n";
+    std::cout << "Ecc mode   : " << Infos::ECC(ecc) << "\n";
+    std::cout << "Ecc blocks : " << nb << "\n";
+    std::cout << "ndata blocks : " << nb << "\n";
+    auto grid = mk_grid(version);
+    const auto path = grid_pos(grid);
+    const auto info = info_pos(17 + version * 4);
+
+    // write mode
+    std:: string bits = std::bitset<4>(mode).to_string();
+    // write message size
+    bits += std::string(get_len(version, mode) - 8,'0');
+    bits += std::bitset<8>(msg.size()).to_string();
+    // write message size
+    bits += encode(msg, mode);
+    // pad the bits with zeros until it's size is a multiple of a byte;
+    // const int fill = capacity[version][mode][ecc] - msg.size() + 4;
+    // for (int i = 0; i < std::min(4, fill); i++) bits += '0';
+    while(bits.size() % 8 != 0) bits += '0';
+    const int max_bits = ndata * 8;
+
+    for (int i = 0; bits.size() < max_bits; i++) {
+        bits += std::bitset<8>(padding[i % 2]).to_string();
+    }
+
+    // make the reed-solomon polynomial for each block
+    for (int cluster = 0; cluster < nb; cluster++) {
+        std::string sub = bits.substr(cluster * dc * 8, dc * 8);
+        polynomial data = get_bits2(sub, ec + dc);
+        polynomial reed = rs_encode(data, ec);
+
+        std::cout << "block " << cluster << " :: " << show::simplified(reed) << "\n";
+        for (int i = dc; i < reed.size(); i++) {
+            bits += std::bitset<8>(reed[i]).to_string();
+        }
+    }
+
+    std::cout << "binary size : " << bits.size() << "\n\n";
+    // write bits on the grid
+    for (int i = 0; i < path.size(); i++) {
+        auto &[x,y] = path[i];
+        grid[y][x] = (i < bits.size()) ? bits[i] - 48 : 0 ;
+    }
+
+    int mask = mk_mask(grid);
+
+    std::cout << "Mask       : " << mask << "\n";
+
+    // apply mask
+    for (auto &[x,y] : path) {
+        grid[x][y] ^= set_mask(mask, x, y);
+    }
+
+    // write format infos on the grid
+    for (int i = 0; i < info.size(); i++) {
+        auto &[x,y] = info[i];
+        grid[x][y] = information[ecc][mask][i / 2] - '0';
+    }
+
+    // std::cout << Infos::show(ecc, mode, version);
+    // std::cout << Infos::grid(grid);
+    return grid;
+}
+
+std::string qr_read (const std::vector<std::vector<int>> &qr) { // up to version 7
+
+    const int version = std::max(0ul, ((qr.size() - 17) / 4));
+
+    if (version == 0) return "";
+    if (version >= 7) {
+        int version_to_check = get_version(qr);
+
+        if (version_to_check == -1) {
+            std::cout << "error reading version information.\n";
+        }
+    }
+
+    const auto info = info_pos(qr.size());
+    std::string format[2];
+    std::string src, bits;
+
+    std::cout << "\n\n---decoding---\n\n";
+    std::cout << "Version    : " << version << "\n" << std::flush;
+
+    // read format infos
+    for (int i = 0; i < info.size(); i++) {
+        auto [x,y] = info[i];
+        format[i % 2] += qr[x][y] + '0';
+    }
+
+
+    if (format[0] != format[1]) {
+        const int a = dec_format_info(bin2int(format[0]));
+        const int b = dec_format_info(bin2int(format[1]));
+        std::cout << "The format information contains errors.\n";
+
+        if (a != b) {
+            std::cout << "can't decode qr : too much damage.\n";
+            return "";
+        }
+    } else {
+        std::cout << "The format information has no errors\n";
+    }
+
+    const int ecc = bin2int(format[0].substr(0,2)) ^ 2;
+    const int mask = bin2int(format[0].substr(2,3)) ^ 5;
+
+    const int ndata = codewords[ecc][version]; // total of data codewords
+    const int ec = ecsize[ecc][version];   // number of ecc codewords by block
+    const int nb = err_blocks[ecc][version]; // number of ecc blocks
+    const int dc = ndata / nb;               // number of data codeword for each ecc block
+
+    std::cout << "Mask       : " << mask << "\n";
+    std::cout << "Ecc mode   : " << Infos::ECC(ecc) << "\n\n";
+    std::cout << "Ecc blocks : " << nb << "\n";
+
+    // read qr code
+    for (auto &[x,y] : grid_pos(mk_grid(version))) {
+        src += (set_mask(mask, x, y) ^ qr[y][x]) + '0';
+    }
+    // cout << "size : " << src.size() << "\n";
+    // reed-solomon decoding :
+    // [              block 1            ][              block ...           ]
+    // [[data polynomial][ecc polynomial]] [[data polynomial][ecc polynomial]]
+
+    for (int block = 0; block < nb; block++) {
+        const std::string sub1 = src.substr(block * dc * 8, dc * 8); // binary data block
+        const std::string sub2 = src.substr(ndata * 8 + block * ec * 8, ec * 8); // binary ecc block
+
+        std::cout << "Decoding ecc block : " << block ;
+        polynomial code(get_bits2(sub1 + sub2, dc + ec));
+        polynomial reed = rs_decode(code, ec);
+
+        if (reed.size() == 0)  {
+            std::cout << "can't decode qr : too much damage.\n";
+            return "";
+        }
+        // std::cout << show::simplified(code) << "\n\n" ;
+        // std::cout << show::simplified(reed) << "\n\n" ;
+
+        for (int i = 0; i < dc; i++) {
+            bits += std::bitset<8>(reed[i]).to_string();
+        }
+    }
+
+    const int mode = bin2int(bits.substr(0, 4)); // the message mode is inscribed in the first 4 bits
+    const int nbit = get_len(version, mode); // the message size is inscribed in the 8th, 9th or 10th following bits (depending of the version and te mode)
+    const int mlen = bin2int(bits.substr(4, nbit));
+
+    std::cout << "Mode       : " << Infos::mode(mode) << "\n";
+    std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n\n";
+
+    bits = bits.substr(4 + nbit);
+
+    return decode(bits, mode, mlen);
+}
+
+
+
+// int main () {
+//
+//     // ...
+//     // Step 5: Apply threshold
+//     // Step 6: Detect border
+//     // Step 7: Get cell size and rescale
+//     // Step 8: Find patterns and rotate qr
+//
+//
+//     cout << "\n\n\n";
+//     // std::string msg = "https://jbirnick.github.io/";
+//     // msg = "https://qrcode.com/";
+//     // auto qr = qr_write(msg, H);
+//     // std::string txt = qr_read(qr);
+//
+//     Image pic;
+//     pic = Image::from_file ("pictures/ys2XE.pgm");
+//     pic = simpl_thresh(pic);
+//     std::vector<std::vector<int>> qr = detect(pic);
+//
+//     // cout << Infos::grid(qr);
+//
+//     // cout << "[" << txt << "]\n";
+//     cout  << "\nexit\n";
+// }
