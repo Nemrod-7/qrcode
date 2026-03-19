@@ -1,180 +1,120 @@
 #include <iostream>
 #include <vector>
-
+#include <map>
 #include <set>
+
+#include "include/utils.hpp"
 #include "include/image.hpp"
 #include "include/qr.hpp"
+// using namespace std;
 
-using namespace std;
+////////////////////////////////////////////////////////////////////////////////
+std::vector<int> filter(const std::vector<int> &line) {
+    std::vector<int> pos = {0, line[0]};
+    std::map<int,int> hist;
+    int maxv = 0; // maximum length between 2 cells ?
 
-vector<int> filter(const vector<int> &ve) {
-    vector<int> res;
+    for (int i = 1; i < line.size(); i++) {
+        int rate = line[i] - line[i-1];
 
-    for (int i = 1; i < ve.size(); i++) {
-        // int diff = ve[i] - ve[i - 1];
-        // if (diff != 1) {
-            res.push_back(ve[i]);
-        // }
+        hist[rate]++;
+        maxv = std::max(maxv, rate);
+
+        if (rate > 3) pos.push_back(line[i]);
     }
 
-    return res;
+    // for (auto &[value, freq] : hist) {
+    //     std::cout << value << " : " << freq << "\n";
+    // }
+
+    return pos;
 }
-
-
-Image crop (const Image &pic) {
-
-    int minx = 0, miny = 0;
-    int maxx = pic.width - 1, maxy = pic.height - 1;
-
-    do {
-        int cell = 0;
-
-        for (int x = 0; x < pic.width; x++) {
-            if (pic.pixels[miny * pic.width + x] == black) {
-                cell++;
-            }
-        }
-
-        if (cell > 6) break;
-    } while (miny++ < pic.height);
-
-    do {
-        int cell = 0;
-
-        for (int y = 0; y < pic.height; y++) {
-            if (pic.pixels[y * pic.width + minx] == black) {
-                cell++;
-            }
-        }
-        if (cell > 6) break;
-    } while (minx++ < pic.width);
-
-    do {
-        int cell = 0;
-        for (int x = 0; x < pic.width; x++) {
-            if (pic.pixels[maxy * pic.width + x] == black) {
-                cell++;
-            }
-        }
-        if (cell > 6) break;
-    } while (maxy-->0);
-
-    do {
-        int cell = 0;
-        for (int y = 0; y < pic.height; y++) {
-            if (pic.pixels[y * pic.width + maxx] == black) {
-                cell++;
-            }
-        }
-        if (cell > 6) break;
-    } while (maxx-->0);
-
-
-    // printf("%i %i\n", minx, miny);
-    int nh = maxy - miny, nw = maxx - minx;
-    Image next;
-
-    for (int y = miny; y < maxy; y++) {
-        for (int x = minx; x < maxx; x++) {
-            next.pixels.push_back(pic.pixels[y * pic.width + x]);
-        }
-    }
-    next.width = nw, next.height = nw;
-
-    return next;
-}
-
-void ttt(const Image &pic) {
-    set<int> histx = {0}, histy = {0};
+std::vector<int> scan (const Image &pic) {
+    std::set<int> line;
+    int maxv = 0, minv = 9999;
+    // printf("width %i height %i\n", pic.width, pic.height);
 
     for (int y = 0; y < pic.height; y++) {
-        int cell = 0;
-
         for (int x = 1; x < pic.width; x++) {
             int ix = y * pic.width + x;
-
             if (pic.pixels[ix] != pic.pixels[ix - 1] ) {
-                cell++;
-                histx.insert(x);
+                line.insert(x);
             }
         }
-
-        printf("%i ", cell);
-
-
     }
 
-    // for (int x = 0; x < pic.width; x++) {
-    //     for (int y = 1; y < pic.height; y++) {
-    //         int ix = y * pic.width + x;
-    //         int px = (y - 1) * pic.width + x;
-    //
-    //         if (pic.pixels[ix] != pic.pixels[px]) {
-    //             histy.insert(y);
-    //         } 
-    //     }
-    // }
-    //
-    // vector<int> coordx = {histx.begin(), histx.end()};
-    // vector<int> coordy = {histy.begin(), histy.end()};
-    //
-    // for (int i = 1; i < coordy.size(); i++) {
-    //     int y = coordy[i];
-    //
-    //     printf("%i ", coordy[i] - coordy[i-1]);
-    //     for (int j = 0; j < coordx.size(); j++) {
-    //         int x = coordx[j];
-    //         int ix = y * pic.width + x;
-    //
-    //         int bit = pic.pixels[ix] == black ? '#' : ' ';
-    //         // printf("%c ", bit );
-    //     }
-    //     // printf("\n");
-    // }
+    for (int x = 0; x < pic.width; x++) {
+        for (int y = 1; y < pic.height; y++) {
+            int ix = y * pic.width + x, px = (y - 1) * pic.width + x;
+            if (pic.pixels[ix] != pic.pixels[px]) {
+                line.insert(y);
+            }
+        }
+    }
 
+    std::vector<int> pos = filter({line.begin(), line.end()});
+    pos.push_back(pic.width);
+
+    return pos;
 }
+std::vector<std::vector<int>> to_vec (const Image &pic) { // place all qr data bits on a grid
+  const std::vector<int> pos = scan(pic);
+  const int size = pos.size() - 1;
+  std::vector<std::vector<int>> qr (size, std::vector<int>(size)) ;
+  // std::cout << "size : " << size << '\n';
+  for (int i = 0; i < size; i++) {
+      for (int j = 0; j < size; j++) {
+          int bl = 0, wh = 0;
+
+          for (int y = pos[i]; y < pos[i + 1]; y++) {
+              for (int x = pos[j]; x < pos[j + 1]; x++) {
+                  const int pix = pic.pixels[y * pic.width + x];
+
+                  pix == black ? bl++ : wh++;
+              }
+          }
+          qr[i][j] = bl > wh ? 1 : 0;
+      }
+  }
+
+  return qr;
+}
+////////////////////////////////////////////////////////////////////////////////
 
 int main() {
 
     Image pic;
-    pic = Image::from_file ("pictures/Micro_QR_Example.pnm");
+    // pic = Image::from_file ("pictures/Micro_QR_Example.pnm");
+    // pic = Image::from_file ("pictures/ys2XE.pgm");
+    pic = Image::from_file ("pictures/ex2.pnm");
     pic = simpl_thresh(pic);
     pic = crop(pic);
 
+    std::vector<std::vector<int>> qr = to_vec(pic);
+    // std::vector<std::vector<int>> qr  = rescale(pic);
 
-    int scale = 3;
-    int nw = pic.width / scale;
-    int nh = pic.height / scale;
-    std::vector<std::vector<int>> qr (nh, vector<int>(nw)) ;
+    if (qr.size() < 20) {
+        // Micro QR
 
-    // for (int y = 0; y < nh; y++) {
-    //     for (int x = 0; x < nw; x++) {
-    //         const int sx = x * scale, sy = y * scale;
-    //         const int nx = (x + 1) * scale, ny = (y + 1) * scale;
-    //
-    //         int kernel = 0;
-    //         for (int i = 0; i < scale; i++) {
-    //             for (int j = 0; j < scale; j++) {
-    //                 int pix = pic.pixels[(sy + i) * pic.width + (sx + j) ];
-    //                 kernel += pix;
-    //             }
-    //         }
-    //
-    //         int bit = kernel / (scale * scale);
-    //
-    //         qr[y][x] = (bit < 255 / 2) ? 1 : 0;
-    //
-    //     }
-    // }
-    //
-    // cout << Infos::grid(qr);
+    } else {
+        // QR code
+        std::vector<std::vector<int>> pattern(7, std::vector<int>(7));
+        const int size = qr.size();
+        int index = 0;
+        finder(pattern, 3, 3);
 
-    // for (int y = 0; y < nh; y++) {
-    //     for (int x = 0; x < nw; x++) {
-    //
-    //     }
-    // }
+        while (!identify(0, 0, qr, pattern) || !identify(size - 7, 0, qr, pattern) || !identify(0, size - 7, qr, pattern)) {
+            if (index > 4) {
+                std::cout << "can't find orientation.\n";
+                break;
+            }
+            qr = rotate(qr);
+            index++;
+        }
+    }
 
-    // cout << "[" << txt << "]\n";
-    // std::cout << "\nend\n";
+    std::cout << Infos::grid(qr);
+
+
+    std::cout << "\nend\n";
 }
