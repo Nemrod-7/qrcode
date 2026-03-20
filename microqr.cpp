@@ -7,14 +7,6 @@
 
 using namespace std;
 
-// const int capacity[5][2] = { ?????
-//     // [data modules] [data capacity]
-//     { 36,  5},
-//     { 80, 10},
-//     {132, 17},
-//     {192, 24}
-// };
-
 static std::string grid (const std::vector<std::vector<int>> &grid) {
     std::string os;
     for (int i = 0; i < grid.size(); i++) {
@@ -28,14 +20,14 @@ static std::string grid (const std::vector<std::vector<int>> &grid) {
 
 bool set_mask(int level, int x, int y) {
     switch(level) {
-        case 0 : return	(y + x) % 2 == 0;
-        case 1 : return	(y) % 2 == 0;
-        case 2 : return (x) % 3 == 0;
-        case 3 : return (y + x) % 3 == 0;
-        case 4 : return ( (y / 2) + (x / 3) ) % 2 == 0;
-        case 5 : return ((y * x) % 2) + ((y * x) % 3) == 0;
-        case 6 : return ( ((y * x) % 2) + ((y * x) % 3) ) % 2 == 0;
-        case 7 : return ( ((y + x) % 2) + ((y * x) % 3) ) % 2 == 0;
+        case 0  : return	(y + x) % 2 == 0;
+        case 1  : return	(y) % 2 == 0;
+        case 2  : return (x) % 3 == 0;
+        case 3  : return (y + x) % 3 == 0;
+        case 4  : return ( (y / 2) + (x / 3) ) % 2 == 0;
+        case 5  : return ((y * x) % 2) + ((y * x) % 3) == 0;
+        case 6  : return ( ((y * x) % 2) + ((y * x) % 3) ) % 2 == 0;
+        case 7  : return ( ((y + x) % 2) + ((y * x) % 3) ) % 2 == 0;
         default : return 0;
     }
 }
@@ -52,14 +44,13 @@ namespace Micro {
   // ie : 000 = (M1 L) 011 = (M3, L)
   // there is no logic behind that. Just take the infor from the two tables below.
 
-  //                  version {M1,M2,M2,M3,M3,M4,M4,M4};
+  const unsigned vrlevel[8] = {M1,M2,M2,M3,M3,M4,M4,M4};
   const unsigned eclevel[8] = { L, L, M, L, M, L, M, Q};
 
   // the fourth and fifth data bits of the format information contain
   // the data mask pattern reference, only mask 1, 4, 6 and 7 are allowed
   // for the micro qr version.
   const unsigned mqmask[4] = { 1, 4, 6, 7};
-
 
   //                                         [         data codewords         ] [            ecc codewords             ]
   // the qr binary data is encoded like this [[[mode][data length][data][0000]] [ecc block 1][ecc block 2][ecc block...]
@@ -85,14 +76,13 @@ namespace Micro {
     {  0,  0,  0, 10 }, // Q
   };
 
-  // number of databits
-  //  databits[ecc][version] -> number of [databits] possible
+  //  ecsize[ecc][version] -> number of [ecc codwords] needed for each block.
   //  M L H Q
-  const unsigned databits[4][41] = {
-  //M1,  M2,  M3,  M4,
-  { 20, 40, 84, 128}, // L
-  {  0, 32, 68, 112}, // M
-  {  0 , 0,  0,  80}, // Q
+  const unsigned ecsize[3][4] = {
+  //  M1, M2, M3, M4,
+    {  2,  5,  6,  8 }, // L
+    {  0,  6,  8, 10 }, // M
+    {  0,  0,  0, 14 }, // Q
   };
 
   // the number of bits necessary to record the size of the txt
@@ -116,7 +106,7 @@ namespace Micro {
       }
 
       for (int i = 8; i < size; i++) { // timing patttern
-          grid[0][i] = grid[i][0] = i % 2 == 0;
+          grid[0][i] = grid[i][0] = (i % 2 == 0);
       }
 
       return grid;
@@ -147,64 +137,64 @@ namespace Micro {
 std::string read (const std::vector<std::vector<int>> &qr) {
 
     const int version = (qr.size() - 11) / 2;
-    // const int size = qr.size();
     std::cout << ":: decoding :: " << "\n";
     std::cout << "   micro QR    " << "\n";
-    std::cout << "Version    : " << version + 1 << "\n";
+    std::cout << "Version    : M" << version + 1 << "\n";
 
-    std::string format;
-    std::string txt, src, bits;
+    std::string str;
+    std::string src, bits;
 
     // format information zone
-    for (int i = 1; i < 8; i++) format += qr[8][i] + '0';
-    for (int i = 8; i > 0; i--) format += qr[i][8] + '0';
+    for (int i = 1; i < 8; i++) str += qr[8][i] + '0';
+    for (int i = 8; i > 0; i--) str += qr[i][8] + '0';
 
-    const int info = dec_format_info(bin2int(format));
-        // std::cout << "The format information contains errors.\n";
-        // std::cout << "can't decode qr : too much damage.\n";
+    // xor with 100010001000101
+    const int format = dec_format_info(bin2int(str) ^ 0x4445) ;
 
-        // std::cout << "The format information has no errors\n";
+    if (vrlevel[(format >> 2)] != version) {
+        std::cout << "format error.\n";
+        return "";
+    }
+    printf("%015b\n", format);
 
-    const int ecc = eclevel[bin2int(format.substr(0,3) )/* ^2 */];
-    const int mask = mqmask[bin2int(format.substr(2,3)) /* ^ 5 */];
-
+    const int ecc = eclevel[(format >> 2)];
+    const int mask = mqmask[(0b11 & format)];
+    const int ec = ecsize[ecc][version];
+    const int dc = codewords[ecc][version];
     std::cout << "Mask       : " << mask << "\n";
-    // std::cout << "Ecc mode   : " << Infos::ECC(ecc) << "\n\n";
+    std::cout << "Ecc mode   : " << ecc << "\n\n";
 
     // read qr code
     for (auto &[x,y] : grid_pos(Micro::make(version))) {
         src += (set_mask(mask, x, y) ^ qr[y][x]) + '0';
     }
 
-    // const std::string sub1 = src.substr(dc * 8, dc * 8); // binary data block
-    // const std::string sub2 = src.substr(ndata * 8 + ec * 8, ec * 8); // binary ecc block
-    //
-    // std::cout << "Decoding ecc block " ;
-    // polynomial code(get_bits2(sub1 + sub2, dc + ec));
-    // polynomial reed = rs_decode(code, ec);
-    //
-    // if (reed.size() == 0)  {
-    //     std::cout << "can't decode qr : too much damage.\n";
-    //     return "";
-    // }
-    // // std::cout << show::simplified(code) << "\n\n" ;
-    // // std::cout << show::simplified(reed) << "\n\n" ;
+    std::cout << "Decoding ecc block.\n" ;
+    // std::cout << "DEBUG :: " << dc + ec << "::\n";
+    const polynomial code (get_bits2(src, dc + ec));
+    const polynomial reed = rs_decode(code, ec);
 
-    // for (int i = 0; i < dc; i++) {
-    //     bits += std::bitset<8>(reed[i]).to_string();
-    // }
+    if (reed.size() == 0)  {
+        std::cout << "can't decode qr : too much damage.\n";
+        return "";
+    }
+    std::cout << show::simplified(code) << "\n\n" ;
+    std::cout << show::simplified(reed) << "\n\n" ;
 
-    // const int mode = bin2int(bits.substr(0, 4)); // the message mode is inscribed in the first 4 bits
-    // const int nbit = get_len(version, mode); // the message size is inscribed in the 8th, 9th or 10th following bits (depending of the version and te mode)
-    // const int mlen = bin2int(bits.substr(4, nbit));
+    for (int i = 0; i < dc; i++) {
+        bits += std::bitset<8>(reed[i]).to_string();
+    }
+
+    const int mode = bin2int(bits.substr(0, 4)); // the message mode is inscribed in the first 4 bits
+    const int nbit = length_bits[version][mode]; // the message size is inscribed in the 8th, 9th or 10th following bits (depending of the version and te mode)
+    const int mlen = bin2int(bits.substr(4, nbit));
     //
-    // std::cout << "Mode       : " << Infos::mode(mode) << "\n";
-    // std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n\n";
-    //
-    // bits = bits.substr(4 + nbit);
-    //
+    std::cout << "Mode       : " << mode << "\n";
+    std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n\n";
+
+    bits = bits.substr(4 + nbit);
+
     // return decode(bits, mode, mlen);
-
     return "";
 }
 
@@ -220,11 +210,7 @@ int main () {
     // M3 =  7 bytes, 10 bytes,
     // M4 = 10 bytes, 14 bytes ?
 
-    // L=1, M=0, Q=3, H=2
-    //const int ecc = 1, mask = 4;
-    //const int data = bitset<15>(information[ecc][mask]).to_ulong() ^ 0x5412;
-
-    std::vector<std::vector<int>> micro = {
+    const std::vector<std::vector<int>> micro = {
     {1,1,1,1,1,1,1,0,1,0,1,0,1,0,1},
     {1,0,0,0,0,0,1,0,0,0,1,1,1,1,1},
     {1,0,1,1,1,0,1,0,0,0,1,1,1,1,1},
@@ -235,26 +221,15 @@ int main () {
     {0,0,0,0,0,0,0,0,0,0,0,1,0,0,1},
     {1,0,0,0,1,1,0,0,1,1,1,0,1,0,0},
     {0,0,0,1,1,1,0,0,1,0,1,0,1,1,1},
-    {1,1,1,0,0,1,1,0,0,0,1,0,1,0,1},
+    {1,1,0,0,1,1,0,0,0,0,1,0,1,0,1},
     {0,0,1,0,0,1,1,1,0,0,1,1,0,1,0},
     {1,0,1,1,1,1,0,0,1,0,1,0,0,0,0},
     {0,0,1,1,0,1,1,1,1,1,0,0,1,0,1},
-    {1,1,1,1,1,1,0,0,0,1,0,1,1,1,1}};
+    {1,1,1,1,1,1,0,0,0,1,0,1,1,1,1}
+  };
 
-    /*
-    numeric   : all
-    alphanum  : > M1
-    byte      : > M2
-    kanji     : > M2
-
-    */
-
-
-    Micro::read(micro);
-
-    for (int version = 0; version < 20; version++) {
-
-    }
+    // std::cout << grid(micro);
+    // Micro::read(micro);
 
     for (int ecc = 0; ecc < 4; ecc++) {
         for (int mask = 0; mask < 8; mask++) {
@@ -266,18 +241,22 @@ int main () {
 
         }
     }
+    int i = 0;
+    auto grid = Micro::make(Micro::M1);
 
-    // for (int i = 1; i < 5; i++) {
-    //     auto qr = make(i);
-    //
-    //     for (int i = 0; i < qr.size(); i++) {
-    //         for (int j = 0; j < qr.size(); j++) {
-    //             cout << qr[i][j] << " ";
-    //         }
-    //         cout << '\n';
-    //     }
-    //     // micro_read(qr);
-    // }
+    for (auto &[x,y] : grid_pos(grid)) {
+        grid[y][x] = i++  ;
+    }
+    for (int i = 0; i < grid.size(); i++) {
+        for (int j = 0; j < grid.size(); j++) {
+            printf("%2i ", grid[i][j]);
+        }
+
+        printf("\n");
+    }
 
 
+
+
+    cout << "\nexit\n";
 }

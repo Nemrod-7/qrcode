@@ -125,16 +125,6 @@ class Infos {
             }
         }
 
-        static std::string grid (const std::vector<std::vector<int>> &grid) {
-            std::string os;
-            for (int i = 0; i < grid.size(); i++) {
-                for (int j = 0; j < grid.size(); j++) {
-                    os += (grid[i][j] == 0) ? ". " : "# ";
-                }
-                os += '\n';
-            }
-            return os;
-        }
         static std::string show (int ecc, int mode, int version) {
             std::string os;
             // std::cout << "codewords : " << ((capacity[version][mode][ecc] + 4) - msg.size()) << "\n";

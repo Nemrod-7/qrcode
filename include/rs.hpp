@@ -51,8 +51,8 @@ int gen_format_info (int ecc, int mask) {
     // For decoding (syndrome computation + Berlekamp–Massey), additional GF(16) arithmetic is required
     const int data_bits = ((ecc << 3) | mask) << 10;
     const int codewords = shift(data_bits, 0x537, 15, 5);
-    // mask it (xor) with 101010000010010 (integer : 21522 hex :  0x5412)
-    return (data_bits | codewords) ^ 0x5412;
+
+    return (data_bits | codewords);
 }
 int dec_format_info (int data) {
     // BHC error correction
@@ -238,6 +238,7 @@ polynomial rs_encode (const polynomial &data, int degree) {
     return edc;
 }
 polynomial rs_decode (const polynomial &data, int degree) {
+    if (!data.size()) return data;
 
     // polynomial erased;
     // count the number of erasures
@@ -259,6 +260,7 @@ polynomial rs_decode (const polynomial &data, int degree) {
         std::cout << "\nThe data has no errors\n";
         return data;
     }
+
     // const polynomial locator = forney(synd, erased, data.size()); // prepare the error locator polynomial
     // const polynomial errors = find_err(locator, data.size()); // locate the message errors
     const polynomial errors = find_err(synd, data.size()); // locate the message errors

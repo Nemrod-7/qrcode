@@ -31,14 +31,14 @@ std::vector<int> getbyte (const std::string &bits, int st, int nd, int nbits) {
 
 bool set_mask(int level, int x, int y) {
     switch(level) {
-        case 0 : return	(y + x) % 2 == 0;
-        case 1 : return	(y) % 2 == 0;
-        case 2 : return (x) % 3 == 0;
-        case 3 : return (y + x) % 3 == 0;
-        case 4 : return ( (y / 2) + (x / 3) ) % 2 == 0;
-        case 5 : return ((y * x) % 2) + ((y * x) % 3) == 0;
-        case 6 : return ( ((y * x) % 2) + ((y * x) % 3) ) % 2 == 0;
-        case 7 : return ( ((y + x) % 2) + ((y * x) % 3) ) % 2 == 0;
+        case 0  : return (y + x) % 2 == 0;
+        case 1  : return (y) % 2 == 0;
+        case 2  : return (x) % 3 == 0;
+        case 3  : return (y + x) % 3 == 0;
+        case 4  : return ((y / 2) + (x / 3) ) % 2 == 0;
+        case 5  : return ((y * x) % 2) + ((y * x) % 3) == 0;
+        case 6  : return (((y * x) % 2) + ((y * x) % 3) ) % 2 == 0;
+        case 7  : return (((y + x) % 2) + ((y * x) % 3) ) % 2 == 0;
         default : return 0;
     }
 }
@@ -353,6 +353,9 @@ namespace QR {
       for (auto &[x,y] : path) {
           grid[x][y] ^= set_mask(mask, x, y);
       }
+      // to implement : BCH (15 5) encoder
+      // mask it (xor) with 101010000010010 (integer : 21522 hex :  0x5412)
+      // std::string infos = (gen_format_info(ecc, mask) ^ 0x5412);
 
       // write format infos on the grid
       for (int i = 0; i < info.size(); i++) {
@@ -378,34 +381,32 @@ namespace QR {
       }
 
       const auto info = info_pos(qr.size());
-      std::string format[2];
+      std::string fortemp[2];
       std::string src, bits;
-
       std::cout << "\n\n---decoding---\n\n";
       std::cout << "Version    : " << version << "\n" << std::flush;
 
       // read format infos
       for (int i = 0; i < info.size(); i++) {
           auto [x,y] = info[i];
-          format[i % 2] += qr[x][y] + '0';
+          fortemp[i % 2] += qr[x][y] + '0';
       }
+      int format = dec_format_info(bin2int(fortemp[0]) ^ 0x5412);
 
-
-      if (format[0] != format[1]) {
-          const int a = dec_format_info(bin2int(format[0]));
-          const int b = dec_format_info(bin2int(format[1]));
+      if (fortemp[0] != fortemp[1]) {
+          const int b = dec_format_info(bin2int(fortemp[1]) ^ 0x5412);
           std::cout << "The format information contains errors.\n";
 
-          if (a != b) {
-              std::cout << "can't decode qr : too much damage.\n";
-              return "";
+          if (format != b) {
+            std::cout << "can't decode qr : too much damage.\n";
+            return "";
           }
       } else {
           std::cout << "The format information has no errors\n";
       }
 
-      const int ecc = bin2int(format[0].substr(0,2)) ^ 2;
-      const int mask = bin2int(format[0].substr(2,3)) ^ 5;
+      const int ecc = (format >> 2);
+      const int mask = (0b11 & format);
 
       const int ndata = codewords[ecc][version]; // total of data codewords
       const int ec = ecsize[ecc][version];   // number of ecc codewords by block

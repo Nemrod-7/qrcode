@@ -1,6 +1,6 @@
 #pragma once
-#include <vector>
 
+#include <vector>
 
 const std::vector<std::vector<int>> placement = {
 {}, {},
@@ -36,14 +36,13 @@ void align ( std::vector<std::vector<int>> &grid, int x, int y) {
     }
 }
 
-
-std::vector<std::pair<int,int>> grid_pos (const std::vector<std::vector<int>> &grid) {
+std::vector<std::pair<int,int>> grid_pos (const std::vector<std::vector<int>> &grid, bool micro = false) {
     const int size = grid.size();
     int index = size - 1, cycle = 0;
     std::vector<std::pair<int,int>> zone;
 
     while (index > 0) {
-        if (index == 6) index = 5;
+        if (!micro && index == 6) index = 5;
 
         for (int i = 0; i < size; i++) {
             int y = cycle % 2 ? i : (size - 1 - i);

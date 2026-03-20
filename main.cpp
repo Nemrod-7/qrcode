@@ -94,7 +94,7 @@ int main() {
     std::vector<std::vector<int>> qr = to_vec(pic);
     // std::vector<std::vector<int>> qr  = rescale(pic);
 
-    std::cout << Infos::grid(qr);
+    // std::cout << show::grid(qr);
 
     if (qr.size() < 20) {
         // Micro QR
@@ -115,9 +115,8 @@ int main() {
             index++;
         }
 
-        // std::string txt = QR::read(qr);
-        //
-        // std::cout << "text : [" << txt << "]";
+        std::string txt = QR::read(qr);
+        std::cout << "text : [" << txt << "]";
     }
 
 
