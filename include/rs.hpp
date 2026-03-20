@@ -2,28 +2,9 @@
 
 #include <algorithm>
 #include "gf256.hpp"
+#include "bitmanip.hpp"
 
-namespace bit {
-    bool chk (uint64_t num, uint64_t ix) { return num >> ix &1ull; }
-    uint64_t set (uint64_t num, uint64_t ix) { return num | 1ull << ix; }
-    uint64_t tog (uint64_t num, uint64_t ix) { return num ^ 1ull << ix; }
-    uint64_t clr (uint64_t num, uint64_t ix) { return num & ~(1ull << ix); }
 
-    uint64_t cnt (uint64_t num) {
-        uint64_t cnt = 0;
-
-        do { cnt += num &1; } while (num >>= 1);
-
-        return cnt;
-    }
-};
-
-std::string int2bin (const std::vector<u8> &v) {
-    std::string bin;
-    for (auto &it : v) bin += std::bitset<8>(it).to_string();
-    return bin;
-}
-int bin2int(const std::string &src) { return stoi(src, nullptr, 2); }
 //////////////////////////////////reed-solomon//////////////////////////////////
 // polynomial forney (const polynomial &synd, const polynomial &errpos, int errSize) { // formey algorithm
 //
@@ -54,7 +35,6 @@ int shift (int codewords, int generator, int ec, int dc) {
     }
     return codewords;
 }
-
 ///////////////////////////////// BHC code /////////////////////////////////////
 int gen_format_info (int ecc, int mask) {
     // (15,5) BCH code for t = 3 Suitable for hardware-style or embedded implementations
@@ -95,7 +75,6 @@ int dec_format_info (int data) {
 
     return form;
 }
-
 //////////////////////////////// golay code ////////////////////////////////////
 int gen_golay_code (int version) {
     // golay error code [6 bits ][ 12 bits             ]
@@ -121,7 +100,6 @@ int dec_golay_code(int data) {
 
     return vers;
 }
-
 ////////////////////////////////// RS code /////////////////////////////////////
 
 polynomial get_bits2 (const std::string &bits, int total) {

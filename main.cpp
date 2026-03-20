@@ -82,7 +82,6 @@ std::vector<std::vector<int>> to_vec (const Image &pic) { // place all qr data b
 }
 ////////////////////////////////////////////////////////////////////////////////
 
-
 int main() {
 
     Image pic;
@@ -116,9 +115,9 @@ int main() {
             index++;
         }
 
-        std::string txt = qr_read(qr);
-
-        std::cout << "text : [" << txt << "]";
+        // std::string txt = QR::read(qr);
+        //
+        // std::cout << "text : [" << txt << "]";
     }
 
 

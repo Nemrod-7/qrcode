@@ -35,58 +35,7 @@ void align ( std::vector<std::vector<int>> &grid, int x, int y) {
         }
     }
 }
-std::vector<std::vector<int>> mk_grid (int version) {
-    const int size = 17 + version * 4;
-    std::vector<std::vector<int>> grid(size, std::vector<int>(size, 2));
 
-    for (int i = 0; i < 8; i++) {
-        grid[i][8] = grid[8][i] = 0; // informations for the first eye
-        grid[size - i - 1][8] = 0;   // informations for the second eye
-        grid[8][size - i - 1] = 0;   // informations for the third eye
-
-        for (int j = 0; j < 8; j++) { // make blank zones
-            grid[i][j] = 0;            // first eye
-            grid[size - i - 1][j] = 0; // second eye
-            grid[j][size - i - 1] = 0; // third eye
-        }
-    }
-
-    finder(grid, 3, 3);
-    finder(grid, 3, size - 4);
-    finder(grid, size - 4, 3);
-
-    // if (version > 1)
-    for (const auto &x : placement[version]) {
-        for (const auto &y : placement[version]) {
-            if ((x == 6 && y == 6) || (x == 6 && y == size - 7) || (x == size - 7 && y == 6) ) {
-                continue;
-            }
-            align(grid, x, y);
-        }
-    }
-
-    if (version >= 7) {
-        int byte = versinfo[version];
-
-        // write version information
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 6; j++) {
-                bool bit = byte >> (i + j * 3)&1;
-                grid[j][size - 11 + i] = bit;
-                grid[size - 11 + i][j] = bit;
-            }
-        }
-    }
-
-    // make timing pattern
-    for (int i = 7; i < size - 7; i++) {
-        grid[6][i] = grid[i][6] = i % 2 == 0;
-    }
-
-    grid[8][8] = 0;
-    grid[4 * version + 9][8] = 1;  // dark module
-    return grid;
-}
 
 std::vector<std::pair<int,int>> grid_pos (const std::vector<std::vector<int>> &grid) {
     const int size = grid.size();

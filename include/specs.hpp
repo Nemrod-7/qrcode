@@ -7,14 +7,15 @@
 // M : tolerate 15 % of data loss
 // Q : tolerate 25 % of data loss
 // H : tolerate 30 % of data loss
-//
-enum ECC {M, L, H, Q};
 
+enum ECC {M, L, H, Q};
+const std::string alnum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
+const unsigned int padding[2] = {0xec, 0x11}; // bin: 11101100 00010001
+
+//////////////////////////////// QR specific ///////////////////////////////////
 enum MODE {END, NUMERIC, ALPHANUM, STRUCTURED, BYTE, FNC1, _6_, ECI, KANJI};
 // const int Mdb[4][2] = {{1, 4},{2, 6},{4, 8},{8, 16}};
-const std::string alnum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
 
-const unsigned int padding[2] = {0xec, 0x11}; // bin: 11101100 00010001
 //                                         [         data codewords         ] [            ecc codewords             ]
 // the qr binary data is encoded like this [[[mode][data length][data][0000]] [ecc block 1][ecc block 2][ecc block...]
 
@@ -23,7 +24,7 @@ const unsigned int padding[2] = {0xec, 0x11}; // bin: 11101100 00010001
 //           0 -> 1              1 -> 2                    2 -> 4                         3 -> 8
 // END,     NUMERIC,            ALPHANUM,   STRUCTURED,     BYTE,      FNC1,_6_,ECI,       KANJI
 //        M   L  H   Q         M   L    H    Q          M    L   H    Q                 M   L   H    Q
-unsigned capacity[23][9][4] = {
+const unsigned capacity[23][9][4] = {
 {{},{                   },{                   },{},{                   },{},{},{},{                   }},
 {{},{  34,  41,  17,  27},{  20,  25,  10,  16},{},{  14,  17,   7,  11},{},{},{},{   8,  10,   4,   7}},
 {{},{  63,  77,  34,  48},{  38,  47,  20,  29},{},{  26,  32,  14,  20},{},{},{},{  16,  20,   8,  12}},
@@ -48,7 +49,6 @@ unsigned capacity[23][9][4] = {
 {{},{1708,2232, 969,1224},{1035,1352, 587, 742},{},{ 711, 929, 403, 509},{},{},{},{ 438, 572, 248, 314}},
 {{},{1872,2409,1056,1358},{1134,1460, 640, 823},{},{ 779,1003, 439, 565},{},{},{},{ 480, 618, 270, 348}}};
 
-//
 const unsigned int err_blocks [4][41] = { // err_blocks[ecc][version] -> number of [ecc blocks...].
     //  Version: (note that index 0 is for padding, and is set to an illegal value)
     //  1, 2, 3, 4, 5, 6, 7, 8, 9,10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40    Error correction level
@@ -67,7 +67,7 @@ const unsigned int err_blocks [4][41] = { // err_blocks[ecc][version] -> number 
 
 // codewords[ecc][version] -> number of [data codewords] for each version :
 //  M L H Q
-unsigned codewords[4][41] = {
+const unsigned codewords[4][41] = {
 {   0,   16,   28,   44,   64,   86,  108,  124,  154,  182,  216,  254,  290,  334,  365,  415,  453,  507,  563,  627,  669,  714,  782,  860,  914, 1000, 1062, 1128, 1193, 1267, 1373, 1455, 1541, 1631, 1725, 1812, 1914, 1992, 2102, 2216, 2334}, // M
 {   0,   19,   34,   55,   80,  108,  136,  156,  194,  232,  274,  324,  370,  428,  461,  523,  589,  647,  721,  795,  861,  932, 1006, 1094, 1174, 1276, 1370, 1468, 1531, 1631, 1735, 1843, 1955, 2071, 2191, 2306, 2434, 2566, 2702, 2812, 2956}, // L
 {   0,    9,   16,   26,   36,   46,   60,   66,   86,  100,  122,  140,  158,  180,  197,  223,  253,  283,  313,  341,  385,  406,  442,  464,  514,  538,  596,  628,  661,  701,  745,  793,  845,  901,  961,  986, 1054, 1096, 1142, 1222, 1276}, // H
@@ -76,7 +76,7 @@ unsigned codewords[4][41] = {
 
 //  ecsize[ecc][version] -> number of [ecc codwords] needed for each block.
 //  M L H Q
-unsigned ecsize[4][41] = {
+const unsigned ecsize[4][41] = {
 //0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40    Error correction level
 {0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28},  // Medium
 {0,  7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30},  // Low
