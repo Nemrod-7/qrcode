@@ -20,6 +20,7 @@
     Format information decoding => done
 */
 /////////////////////////////// general ////////////////////////////////////
+
 std::vector<int> getbyte (const std::string &bits, int st, int nd, int nbits) {
     std::vector<int> v;
     for (int i = st; i < nd; i += nbits) {
@@ -29,7 +30,7 @@ std::vector<int> getbyte (const std::string &bits, int st, int nd, int nbits) {
     return v;
 }
 
-bool set_mask(int level, int x, int y) {
+bool set_mask (int level, int x, int y) {
     switch(level) {
         case 0  : return (y + x) % 2 == 0;
         case 1  : return (y) % 2 == 0;
@@ -42,21 +43,8 @@ bool set_mask(int level, int x, int y) {
         default : return 0;
     }
 }
-int get_mode (const std::string &src) {
 
-    enum MODE mode = NUMERIC;
-
-    for (auto &it : src) {
-        if (isdigit (it)) mode = std::max (mode, NUMERIC);//mode = max (mode , 1); // numeric
-        if (isupper (it)) mode = std::max (mode, ALPHANUM); // alphanumeric
-        if (islower (it)) mode = std::max (mode, BYTE); // byte
-        // if (iseci (it)) mode = max (mode, ECI); // ECI
-        // if (iskanji (it)) mode = max (mode, KANJI); // kanji
-    }
-
-    return mode;
-}
-int evaluate(const std::vector<std::vector<int>> &grid) {
+int evaluate (const std::vector<std::vector<int>> &grid) {
     int maxv = 0;
     int hor = 0, ver = 0;
     // cout << Infos::grid(grid);
@@ -83,7 +71,7 @@ int evaluate(const std::vector<std::vector<int>> &grid) {
 
     return maxv;
 }
-int mk_mask(const std::vector<std::vector<int>> &grid) {
+int mk_mask (const std::vector<std::vector<int>> &grid) {
 
     const auto path = grid_pos(grid);
     int maxv = 9999, mask = 0;
@@ -105,10 +93,10 @@ int mk_mask(const std::vector<std::vector<int>> &grid) {
     return mask;
 }
 
-std::string encode (const std::string &msg, int mode) {
+std::string encode (const std::string &msg, const std::string &mode) {
     std::string bits;
 
-    if (mode == NUMERIC) {
+    if (mode == "NUMERIC") {
         std::string num = "   ";
         for (int i = 0; i < msg.size(); i += 3) {
             num[0] = msg[i+0];
@@ -121,7 +109,7 @@ std::string encode (const std::string &msg, int mode) {
                 case 3 : bits += std::bitset<10>(std::stoi(num)).to_string(); break;
             }
         }
-    } else if (mode == ALPHANUM) {
+    } else if (mode == "ALPHANUM") {
         const int size = msg.size() % 2 == 0 ? msg.size() : msg.size() - 1;
 
         for (int i = 0; i < size; i += 2) {
@@ -130,13 +118,13 @@ std::string encode (const std::string &msg, int mode) {
             bits += std::bitset<11>(i1 * 45 + i2).to_string();
         }
         if (size % 2 != 1) bits += std::bitset<6>(alnum.find(msg.back())).to_string();
-    } else if (mode == BYTE) {
+    } else if (mode == "BYTE") {
         for (int i = 0; i < msg.size(); i++) {
             bits += std::bitset<8>(msg[i]).to_string();
         }
-    } else if (mode == KANJI) {
+    } else if (mode == "KANJI") {
 
-    } else if (mode == ECI) {
+    } else if (mode == "ECI") {
       /*
       The Extended Channel Interpretation  protocol defined in the
       AIM Inc International Technical Specification Extended Channel Interpretations,
@@ -146,7 +134,7 @@ std::string encode (const std::string &msg, int mode) {
       the ISO/IEC 8859-1 character set.
       */
 
-    } else if (mode == FNC1) {
+    } else if (mode == "FNC1") {
         /*
           FNC1 mode is used for messages constaining specific data formats.
           In the first position it designates data formated in accordance
@@ -158,16 +146,14 @@ std::string encode (const std::string &msg, int mode) {
 
     return bits;
 }
-std::string decode (const std::string &bits, int mode, int size) {
+std::string decode (const std::string &bits, const std::string &mode, int size) {
     std::string txt;
 
-    if (mode == ECI) { // to do
-
-    } else if (mode == NUMERIC) {
+    if (mode == "NUMERIC") {
         for (auto &it : getbyte(bits, 0, (size * 10) / 3, 10)) {
             txt += std::to_string(it);
         }
-    } else if (mode == ALPHANUM) {
+    } else if (mode == "ALPHANUM") {
         const int end = size / 2 * 11;
 
         for (auto &it : getbyte(bits, 0, end, 11)) {
@@ -179,16 +165,141 @@ std::string decode (const std::string &bits, int mode, int size) {
             int i1 = stoi(bits.substr(end , 6), nullptr, 2);
             if (i1 < alnum.size()) txt += alnum[i1];
         }
-    } else if (mode == BYTE) {
+    } else if (mode == "BYTE") {
         for (auto &it : getbyte(bits, 0, (size * 8) , 8)) {
             txt += it;
         }
+    } else if (mode == "KANJI") {
+
+    } else if (mode == "ECI") {
+      /*
+      The Extended Channel Interpretation  protocol defined in the
+      AIM Inc International Technical Specification Extended Channel Interpretations,
+      allows the output data stream to ahave interpretations different from
+      that of The default character set.
+      The default interpretation for QR code is ECI 000003 representing
+      the ISO/IEC 8859-1 character set.
+      */
+
+    } else if (mode == "FNC1") {
+        /*
+          FNC1 mode is used for messages constaining specific data formats.
+          In the first position it designates data formated in accordance
+          to GS1 General specifications.
+          In the second position it designates data formatted in accordance with a
+          specific industry application previously agreed with AIM Inc.
+        */
     }
+
 
     return txt;
 }
+
+// std::string encode (const std::string &msg, int mode) {
+//     std::string bits;
+//
+//     if (mode == NUMERIC) {
+//         std::string num = "   ";
+//         for (int i = 0; i < msg.size(); i += 3) {
+//             num[0] = msg[i+0];
+//             num[1] = (i + 1) < msg.size() ? (msg[i+1]) : 0;
+//             num[2] = (i + 2) < msg.size() ? (msg[i+2]) : 0;
+//
+//             switch(num.size()) {
+//                 case 1 : bits += std::bitset<4>(std::stoi(num)).to_string(); break;
+//                 case 2 : bits += std::bitset<2>(std::stoi(num)).to_string(); break;
+//                 case 3 : bits += std::bitset<10>(std::stoi(num)).to_string(); break;
+//             }
+//         }
+//     } else if (mode == ALPHANUM) {
+//         const int size = msg.size() % 2 == 0 ? msg.size() : msg.size() - 1;
+//
+//         for (int i = 0; i < size; i += 2) {
+//             int i1 = alnum.find(msg[i+0]);
+//             int i2 = alnum.find(msg[i+1]);
+//             bits += std::bitset<11>(i1 * 45 + i2).to_string();
+//         }
+//         if (size % 2 != 1) bits += std::bitset<6>(alnum.find(msg.back())).to_string();
+//     } else if (mode == BYTE) {
+//         for (int i = 0; i < msg.size(); i++) {
+//             bits += std::bitset<8>(msg[i]).to_string();
+//         }
+//     } else if (mode == KANJI) {
+//
+//     } else if (mode == ECI) {
+//       /*
+//       The Extended Channel Interpretation  protocol defined in the
+//       AIM Inc International Technical Specification Extended Channel Interpretations,
+//       allows the output data stream to ahave interpretations different from
+//       that of The default character set.
+//       The default interpretation for QR code is ECI 000003 representing
+//       the ISO/IEC 8859-1 character set.
+//       */
+//
+//     } else if (mode == FNC1) {
+//         /*
+//           FNC1 mode is used for messages constaining specific data formats.
+//           In the first position it designates data formated in accordance
+//           to GS1 General specifications.
+//           In the second position it designates data formatted in accordance with a
+//           specific industry application previously agreed with AIM Inc.
+//         */
+//     }
+//
+//     return bits;
+// }
+// std::string decode (const std::string &bits, int mode, int size) {
+//     std::string txt;
+//
+//     if (mode == ECI) { // to do
+//
+//     } else if (mode == NUMERIC) {
+//         for (auto &it : getbyte(bits, 0, (size * 10) / 3, 10)) {
+//             txt += std::to_string(it);
+//         }
+//     } else if (mode == ALPHANUM) {
+//         const int end = size / 2 * 11;
+//
+//         for (auto &it : getbyte(bits, 0, end, 11)) {
+//             txt += alnum[it / 45];
+//             txt += alnum[it % 45];
+//         }
+//
+//         if (size % 2 != 0) {
+//             int i1 = stoi(bits.substr(end , 6), nullptr, 2);
+//             if (i1 < alnum.size()) txt += alnum[i1];
+//         }
+//     } else if (mode == BYTE) {
+//         for (auto &it : getbyte(bits, 0, (size * 8) , 8)) {
+//             txt += it;
+//         }
+//     }
+//
+//     return txt;
+// }
 //////////////////////////////// QR specific ///////////////////////////////////
+
 namespace QR {
+
+  namespace info {
+    const std::string mode[9] = {"NONE", "NUMERIC", "ALPHANUM", "STRUCTURED", "BYTE", "FNC1", "_6_", "ECI", "KANJI"};
+    const std::string level[4] = {"Medium", "Low", "High", "Quartile"};
+  };
+
+  int get_mode (const std::string &src) {
+
+      enum MODE mode = NUMERIC;
+
+      for (auto &it : src) {
+          if (isdigit (it)) mode = std::max (mode, NUMERIC);//mode = max (mode , 1); // numeric
+          if (isupper (it)) mode = std::max (mode, ALPHANUM); // alphanumeric
+          if (islower (it)) mode = std::max (mode, BYTE); // byte
+          // if (iseci (it)) mode = max (mode, ECI); // ECI
+          // if (iskanji (it)) mode = max (mode, KANJI); // kanji
+      }
+
+      return mode;
+  }
 
   int get_len (int version, int mode) {
       if (version < 10) {
@@ -219,7 +330,7 @@ namespace QR {
           }
       }
 
-      for (int i = 0; i < 41; i++) {
+      for (int i = 1; i < 41; i++) {
           if (versinfo[i] == byte[0]) {
               return i;
           }
@@ -292,7 +403,7 @@ namespace QR {
 
       std::cout << "\n\n---encoding---\n\n";
       std::cout << "Version    : " << version << "\n";
-      std::cout << "Mode       : " << Infos::mode(mode) << "\n";
+      std::cout << "Mode       : " << info::mode[mode] << "\n";
 
       if (version == 0) return {};
 
@@ -302,7 +413,7 @@ namespace QR {
       const int dc = ndata / nb;               // number of data codeword for each ecc block
 
       std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n";
-      std::cout << "Ecc mode   : " << Infos::ECC(ecc) << "\n";
+      std::cout << "Ecc mode   : " << info::level[ecc] << "\n";
       std::cout << "Ecc blocks : " << nb << "\n";
       std::cout << "ndata blocks : " << nb << "\n";
       auto grid = make(version);
@@ -315,7 +426,7 @@ namespace QR {
       bits += std::string(get_len(version, mode) - 8,'0');
       bits += std::bitset<8>(msg.size()).to_string();
       // write message size
-      bits += encode(msg, mode);
+      bits += encode(msg, info::mode[mode]);
       // pad the bits with zeros until it's size is a multiple of a byte;
       // const int fill = capacity[version][mode][ecc] - msg.size() + 4;
       // for (int i = 0; i < std::min(4, fill); i++) bits += '0';
@@ -414,7 +525,7 @@ namespace QR {
       const int dc = ndata / nb;               // number of data codeword for each ecc block
 
       std::cout << "Mask       : " << mask << "\n";
-      std::cout << "Ecc mode   : " << Infos::ECC(ecc) << "\n\n";
+      std::cout << "Ecc mode   : " << info::level[ecc] << "\n\n";
       std::cout << "Ecc blocks : " << nb << "\n";
 
       // read qr code
@@ -450,12 +561,12 @@ namespace QR {
       const int nbit = get_len(version, mode); // the message size is inscribed in the 8th, 9th or 10th following bits (depending of the version and te mode)
       const int mlen = bin2int(bits.substr(4, nbit));
 
-      std::cout << "Mode       : " << Infos::mode(mode) << "\n";
+      std::cout << "Mode       : " << info::mode[mode] << "\n";
       std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n\n";
 
       bits = bits.substr(4 + nbit);
 
-      return decode(bits, mode, mlen);
+      return decode(bits, info::mode[mode], mlen);
   }
 };
 

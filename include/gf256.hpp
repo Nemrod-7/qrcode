@@ -8,41 +8,6 @@
 using u8 = uint8_t;
 using polynomial = std::vector<u8>;
 
-namespace show {
-    std::string simplified (const polynomial &rem) {
-        std::string os;
-        for (int i = 0; i < rem.size(); i++) {
-            std::string num = std::to_string(rem[i]);
-            os += std::string(3 - num.size(), ' ') + num + " ";
-        }
-        return os;
-    }
-
-    std::string poly (const polynomial &p) {
-        std::string os;
-
-        for (int i = 0; i < p.size(); i++) {
-            u8 val = p[i], ex = p.size() - i - 1;
-
-            if (val != 0) {
-                if (os.size() || val < 0) os += val > 0 ? " + " : " - ";
-                os += std::to_string(abs(val));
-                if (ex > 0) os += "x";
-                if (ex > 1) os += "^" + std::to_string(ex);
-            }
-        }
-        return os;
-    }
-    std::string bits (const std::string &bits) {
-        std::string os;
-        for (int i = 0; i < bits.size(); i += 8) {
-            // cout << bitset<8>(bits.substr(i, 8)) << " ";
-            os += std::to_string(stoi(bits.substr(i, 8), nullptr,2)) + " ";
-        }
-        return os;
-    }
-};
-
 namespace gf256 {
     const unsigned char LOG[256] = {
         0xff, 0x00, 0x01, 0x19, 0x02, 0x32, 0x1a, 0xc6, 0x03, 0xdf, 0x33, 0xee, 0x1b, 0x68, 0xc7, 0x4b,
@@ -163,6 +128,43 @@ namespace gf256 {
         return syn;
     }
 };
+
+namespace show {
+    std::string simplified (const polynomial &rem) {
+        std::string os;
+        for (int i = 0; i < rem.size(); i++) {
+            std::string num = std::to_string(rem[i]);
+            os += std::string(3 - num.size(), ' ') + num + " ";
+        }
+        return os;
+    }
+
+    std::string poly (const polynomial &p) {
+        std::string os;
+
+        for (int i = 0; i < p.size(); i++) {
+            u8 val = p[i], ex = p.size() - i - 1;
+
+            if (val != 0) {
+                if (os.size() || val < 0) os += val > 0 ? " + " : " - ";
+                os += std::to_string(abs(val));
+                if (ex > 0) os += "x";
+                if (ex > 1) os += "^" + std::to_string(ex);
+            }
+        }
+        return os;
+    }
+    std::string bits (const std::string &bits) {
+        std::string os;
+        for (int i = 0; i < bits.size(); i += 8) {
+            // cout << bitset<8>(bits.substr(i, 8)) << " ";
+            os += std::to_string(stoi(bits.substr(i, 8), nullptr,2)) + " ";
+        }
+        return os;
+    }
+};
+
+
 
 // // The QR code specification says to use byte-wise modulo 100011101 arithmetic (integer : 285 hex : 0x11d).
 // void generate_table(const int mod = 0x11d) {

@@ -100,39 +100,3 @@ const char information[4][8][16] = {
   { "001011010001001", "001001110111110", "001110011100111", "001100111010000", "000011101100010", "000001001010101", "000110100001100", "000100000111011" }, // H
   { "011010101011111", "011000001101000", "011111100110001", "011101000000110", "010010010110100", "010000110000011", "010111011011010", "010101111101101" }, // Q
 };
-
-class Infos {
-    public :
-        static std::string ECC (int level) {
-            switch(level) {
-                case L : return "Low"; break;
-                case M : return "Medium"; break;
-                case Q : return "Quartile"; break;
-                case H : return "High"; break;
-                default : return ""; break;
-            }
-        }
-        static std::string mode (int mode) {
-            switch(mode) {
-                case ECI : return "ECI"; break;
-                case BYTE : return "BYTE"; break;
-                case FNC1 : return "FNC1"; break;
-                case KANJI : return "KANJI"; break;
-                case NUMERIC : return "NUMERIC"; break;
-                case ALPHANUM : return "ALPHANUM"; break;
-                case STRUCTURED : return "STRUCTURED"; break;
-                default : return ""; break;
-            }
-        }
-
-        static std::string show (int ecc, int mode, int version) {
-            std::string os;
-            // std::cout << "codewords : " << ((capacity[version][mode][ecc] + 4) - msg.size()) << "\n";
-            os += "Ecc : " + Infos::ECC(ecc) + "\n";
-            os += "Mode : " + Infos::mode(mode) + "\n";
-            os += "Version : " + std::to_string(version) + "\n";
-            os += "Capacity : " + std::to_string(capacity[version][mode][ecc]) + "\n";
-            return os;
-            // std::cout << "data codewords : " << dc << " " << "error codewords : " << ec << "\n";
-        }
-};

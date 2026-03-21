@@ -5,6 +5,7 @@
 
 using namespace std;
 
+
 int shift (int codewords, int generator, int ec, int dc) {
 
     for (int i = dc - 1; i >= 0; i--) {
