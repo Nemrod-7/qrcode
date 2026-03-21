@@ -4,7 +4,6 @@
 #include "gf256.hpp"
 #include "bitmanip.hpp"
 
-
 //////////////////////////////////reed-solomon//////////////////////////////////
 // polynomial forney (const polynomial &synd, const polynomial &errpos, int errSize) { // formey algorithm
 //
@@ -27,13 +26,15 @@
 //     return syn;
 // }
 
-int shift (int codewords, int generator, int ec, int dc) {
-    for (int i = dc - 1; i >= 0; i--) {
-        if (codewords >> (i + (ec - dc)) & 1) {
-            codewords ^= generator << i;
+// binary polynomial division
+int shift (int dividend, int divisor, int total, int ncodew) {
+
+    for (int i = ncodew - 1; i >= 0; i--) {
+        if (dividend >> (i + (total - ncodew)) & 1) {
+            dividend ^= divisor << i;
         }
     }
-    return codewords;
+    return dividend;
 }
 ///////////////////////////////// BHC code /////////////////////////////////////
 int gen_format_info (int ecc, int mask) {

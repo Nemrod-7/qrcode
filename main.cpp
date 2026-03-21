@@ -10,7 +10,7 @@
 // using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////
-std::vector<int> filter(const std::vector<int> &line) {
+std::vector<int> filter (const std::vector<int> &line) {
     std::vector<int> pos = {0, line[0]};
     std::map<int,int> hist;
     int maxv = 0; // maximum length between 2 cells ?
@@ -94,7 +94,7 @@ int main() {
     std::vector<std::vector<int>> qr = to_vec(pic);
     // std::vector<std::vector<int>> qr  = rescale(pic);
 
-    // std::cout << show::grid(qr);
+    // std::cout << grid(QR::make(1));
 
     if (qr.size() < 20) {
         // Micro QR
@@ -120,6 +120,5 @@ int main() {
     }
 
 
-
-    std::cout << "\nend\n";
+    std::cout << "\nexit\n";
 }

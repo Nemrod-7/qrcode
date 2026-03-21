@@ -384,7 +384,7 @@ namespace QR {
       std::string fortemp[2];
       std::string src, bits;
       std::cout << "\n\n---decoding---\n\n";
-      std::cout << "Version    : " << version << "\n" << std::flush;
+      std::cout << "Version    : " << version << "\n";
 
       // read format infos
       for (int i = 0; i < info.size(); i++) {
@@ -430,7 +430,7 @@ namespace QR {
           const std::string sub1 = src.substr(block * dc * 8, dc * 8); // binary data block
           const std::string sub2 = src.substr(ndata * 8 + block * ec * 8, ec * 8); // binary ecc block
 
-          std::cout << "Decoding ecc block : " << block ;
+          std::cout << "Decoding ecc block : " << block << "\n" ;
           polynomial code(get_bits2(sub1 + sub2, dc + ec));
           polynomial reed = rs_decode(code, ec);
 
