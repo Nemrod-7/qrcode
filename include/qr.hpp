@@ -195,88 +195,6 @@ std::string decode (const std::string &bits, const std::string &mode, int size) 
     return txt;
 }
 
-// std::string encode (const std::string &msg, int mode) {
-//     std::string bits;
-//
-//     if (mode == NUMERIC) {
-//         std::string num = "   ";
-//         for (int i = 0; i < msg.size(); i += 3) {
-//             num[0] = msg[i+0];
-//             num[1] = (i + 1) < msg.size() ? (msg[i+1]) : 0;
-//             num[2] = (i + 2) < msg.size() ? (msg[i+2]) : 0;
-//
-//             switch(num.size()) {
-//                 case 1 : bits += std::bitset<4>(std::stoi(num)).to_string(); break;
-//                 case 2 : bits += std::bitset<2>(std::stoi(num)).to_string(); break;
-//                 case 3 : bits += std::bitset<10>(std::stoi(num)).to_string(); break;
-//             }
-//         }
-//     } else if (mode == ALPHANUM) {
-//         const int size = msg.size() % 2 == 0 ? msg.size() : msg.size() - 1;
-//
-//         for (int i = 0; i < size; i += 2) {
-//             int i1 = alnum.find(msg[i+0]);
-//             int i2 = alnum.find(msg[i+1]);
-//             bits += std::bitset<11>(i1 * 45 + i2).to_string();
-//         }
-//         if (size % 2 != 1) bits += std::bitset<6>(alnum.find(msg.back())).to_string();
-//     } else if (mode == BYTE) {
-//         for (int i = 0; i < msg.size(); i++) {
-//             bits += std::bitset<8>(msg[i]).to_string();
-//         }
-//     } else if (mode == KANJI) {
-//
-//     } else if (mode == ECI) {
-//       /*
-//       The Extended Channel Interpretation  protocol defined in the
-//       AIM Inc International Technical Specification Extended Channel Interpretations,
-//       allows the output data stream to ahave interpretations different from
-//       that of The default character set.
-//       The default interpretation for QR code is ECI 000003 representing
-//       the ISO/IEC 8859-1 character set.
-//       */
-//
-//     } else if (mode == FNC1) {
-//         /*
-//           FNC1 mode is used for messages constaining specific data formats.
-//           In the first position it designates data formated in accordance
-//           to GS1 General specifications.
-//           In the second position it designates data formatted in accordance with a
-//           specific industry application previously agreed with AIM Inc.
-//         */
-//     }
-//
-//     return bits;
-// }
-// std::string decode (const std::string &bits, int mode, int size) {
-//     std::string txt;
-//
-//     if (mode == ECI) { // to do
-//
-//     } else if (mode == NUMERIC) {
-//         for (auto &it : getbyte(bits, 0, (size * 10) / 3, 10)) {
-//             txt += std::to_string(it);
-//         }
-//     } else if (mode == ALPHANUM) {
-//         const int end = size / 2 * 11;
-//
-//         for (auto &it : getbyte(bits, 0, end, 11)) {
-//             txt += alnum[it / 45];
-//             txt += alnum[it % 45];
-//         }
-//
-//         if (size % 2 != 0) {
-//             int i1 = stoi(bits.substr(end , 6), nullptr, 2);
-//             if (i1 < alnum.size()) txt += alnum[i1];
-//         }
-//     } else if (mode == BYTE) {
-//         for (auto &it : getbyte(bits, 0, (size * 8) , 8)) {
-//             txt += it;
-//         }
-//     }
-//
-//     return txt;
-// }
 //////////////////////////////// QR specific ///////////////////////////////////
 
 namespace QR {
@@ -415,7 +333,7 @@ namespace QR {
       std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n";
       std::cout << "Ecc mode   : " << info::level[ecc] << "\n";
       std::cout << "Ecc blocks : " << nb << "\n";
-      std::cout << "ndata blocks : " << nb << "\n";
+      std::cout << "ndata blocks : " << dc << "\n";
       auto grid = make(version);
       const auto path = grid_pos(grid);
       const auto info = info_pos(17 + version * 4);
@@ -572,14 +490,7 @@ namespace QR {
 
 
 // int main () {
-//
-//     // ...
-//     // Step 5: Apply threshold
-//     // Step 6: Detect border
-//     // Step 7: Get cell size and rescale
-//     // Step 8: Find patterns and rotate qr
-//
-//
+
 //     cout << "\n\n\n";
 //     // std::string msg = "https://jbirnick.github.io/";
 //     // msg = "https://qrcode.com/";
