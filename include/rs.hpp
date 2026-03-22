@@ -37,7 +37,7 @@ int shift (int dividend, int divisor, int total, int ncodew) {
     return dividend;
 }
 ///////////////////////////////// BHC code /////////////////////////////////////
-int gen_format_info (int ecc, int mask) {
+int gen_format_info (int data) {
     // (15,5) BCH code for t = 3 Suitable for hardware-style or embedded implementations
     // generate the information error code
     // standard narrow-sense primitive BCH over GF(2) generator polynomial
@@ -50,7 +50,7 @@ int gen_format_info (int ecc, int mask) {
     // gen : 01010 0110111000 ( polynomial padded to match the information size (ie : 15 bits))
     // num : 01100 0000000000 (ex for ecc 1 and mask 4 -> [01100][00000 00000])
     // For decoding (syndrome computation + Berlekamp–Massey), additional GF(16) arithmetic is required
-    const int data_bits = ((ecc << 3) | mask) << 10;
+    const int data_bits = data << 10;
     const int codewords = shift(data_bits, 0x537, 15, 5);
 
     return (data_bits | codewords);

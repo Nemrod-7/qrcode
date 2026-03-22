@@ -384,7 +384,7 @@ namespace QR {
       }
       // to implement : BCH (15 5) encoder
       // mask it (xor) with 101010000010010 (integer : 21522 hex :  0x5412)
-      // std::string infos = (gen_format_info(ecc, mask) ^ 0x5412);
+      // std::string infos = (gen_format_info((ecc << 3) | mask) ^ 0x5412);
 
       // write format infos on the grid
       for (int i = 0; i < info.size(); i++) {

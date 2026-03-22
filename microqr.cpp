@@ -5,6 +5,7 @@
 
 #include "include/grid.hpp"
 #include "include/rs.hpp"
+#include "QR2.hpp"
 
 using namespace std;
 
@@ -44,20 +45,6 @@ bool set_mask(int level, int x, int y) {
     }
 }
 
-std::string get_mode2 (const std::string &src) {
-    const std::string str[4] = {"NUMERIC", "ALPHANUM", "BYTE", "KANJI"};
-    int mode = 0;
-
-    for (auto &it : src) {
-        if (isdigit (it)) mode = std::max (mode, 0);//mode = max (mode , 1); // numeric
-        if (isupper (it)) mode = std::max (mode, 1); // alphanumeric
-        if (islower (it)) mode = std::max (mode, 2); // byte
-        // if (iseci (it)) mode = max (mode, ECI); // ECI
-        // if (iskanji (it)) mode = max (mode, KANJI); // kanji
-    }
-
-    return str[mode];
-}
 std::string encode (const std::string &msg, const std::string &mode) {
     std::string bits;
 
@@ -161,231 +148,165 @@ std::string decode (const std::string &bits, const std::string &mode, int size) 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+int MQR::get_mode (const std::string &src) {
+    const std::string str[4] = {"NUMERIC", "ALPHANUM", "BYTE", "KANJI"};
+    enum Mode mode = NUMERIC;
 
-namespace MQr {
-////////////////////////////// specifications //////////////////////////////
-  enum Mode {NUMERIC, ALPHANUM, BYTE, KANJI};
-  enum {M1,M2,M3,M4};
-  enum {L,M,Q};
-
-  namespace info {
-      const std::string level[4] = {"Low", "Medium", "Quartile"};
-      const std::string mode[4] = {"NUMERIC", "ALPHANUM", "BYTE", "KANJI"};
-  };
-
-  // the format information forMQr QR differs from the standard QR.
-  // the first 3 bits identify the version and the error eorrection used.
-  // ie : 000 = (M1 L) 011 = (M3, L)
-  // there is no logic behind that. Just take the infor from the two tables below.
-
-  const unsigned vrlevel[8] = {M1,M2,M2,M3,M3,M4,M4,M4};
-  const unsigned eclevel[8] = { L, L, M, L, M, L, M, Q};
-
-  // the fourth and fifth data bits of the format information contain
-  // the data mask pattern reference, only mask 1, 4, 6 and 7 are allowed
-  // for the micro qr version.
-  const unsigned mqmask[4] = { 1, 4, 6, 7};
-
-  //                                         [         data codewords         ] [            ecc codewords             ]
-  // the qr binary data is encoded like this [[[mode][data length][data][0000]] [ecc block 1][ecc block 2][ecc block...]
-
-  // the message received (numeric, alphanumeric, byte or kanji) is encoded and the error correction code chosen determine the size needed and so the size of the grid.
-  // this table is used just to determine the version of the micro qr code and nothing else. : capacity[version][mode][ecc] -> maximum of encoded [data] codewords allowed .
-  //
-  const unsigned capacity[4][4][3] = {
-    //  NUMERIC,    ALPHANUM,    BYTE,    KANJI
-    //   L  M  Q    L  M  Q    L  M  Q    L  M  Q
-      {{ 5, 0, 0},{ 0, 0, 0},{ 0, 0, 0},{ 0, 0, 0}},
-      {{10, 8, 0},{ 6, 5, 0},{ 0, 0, 0},{ 0, 0, 0}},
-      {{23,18, 0},{14,11, 0},{ 9, 7, 0},{ 6, 4, 0}},
-      {{35,30,21},{21,18,13},{15,13, 9},{ 9, 8, 5}},
-  };
-
-  // codewords[ecc][version] -> number of [data codewords] for each version :
-  const unsigned codewords[3][4] = {
-  //  M1, M2, M3, M4,
-    {  3,  5, 11, 16 }, // L
-    {  0,  4,  9, 14 }, // M
-    {  0,  0,  0, 10 }, // Q
-  };
-
-  //  ecsize[ecc][version] -> number of [ecc codwords] needed for each block.
-  const unsigned ecsize[3][4] = {
-  //  M1, M2, M3, M4,
-    {  2,  5,  6,  8 }, // L
-    {  0,  6,  8, 10 }, // M
-    {  0,  0,  0, 14 }, // Q
-  };
-
-  // the number of bits necessary to record the size of the txt
-  // depends of the version and the mode :
-  //   N A B K
-  const unsigned int length_bits[4][4] = {
-      {3,0,0,0}, // M1
-      {4,3,0,0}, // M2
-      {5,4,4,3}, // M3
-      {6,5,5,4}, // M4
-  };
-
-    int get_mode (const std::string &src) {
-
-        enum Mode mode = NUMERIC;
-
-        for (auto &it : src) {
-            if (isdigit (it)) mode = std::max (mode, NUMERIC);//mode = max (mode , 1); // numeric
-            if (isupper (it)) mode = std::max (mode, ALPHANUM); // alphanumeric
-            if (islower (it)) mode = std::max (mode, BYTE); // byte
-            // if (iseci (it)) mode = max (mode, ECI); // ECI
-            // if (iskanji (it)) mode = max (mode, KANJI); // kanji
-        }
-
-        return mode;
+    for (auto &it : src) {
+        if (isdigit (it)) mode = std::max (mode, NUMERIC);//mode = max (mode , 1); // numeric
+        if (isupper (it)) mode = std::max (mode, ALPHANUM); // alphanumeric
+        if (islower (it)) mode = std::max (mode, BYTE); // byte
+        // if (iseci (it)) mode = max (mode, ECI); // ECI
+        // if (iskanji (it)) mode = max (mode, KANJI); // kanji
     }
 
-  std::vector<std::vector<int>> make (int version) { // M1, M2, M3, M4
-      const int size = 2 * version + 11;
-      std::vector<std::vector<int>> grid(size, std::vector<int>(size, 2));
-      finder(grid, 3, 3);
+    return mode;
+}
+std::vector<std::vector<int>> MQR::make (int version) { // M1, M2, M3, M4
+    const int size = 2 * version + 11;
+    std::vector<std::vector<int>> grid(size, std::vector<int>(size, 2));
+    finder(grid, 3, 3);
 
-      for (int i = 0; i < 8; i++) {
-          grid[7][i] = grid[i][7] = 0; // quiet zone
-          grid[8][i + 1] = grid[i + 1][8] = 0; // format information zone
-      }
+    for (int i = 0; i < 8; i++) {
+        grid[7][i] = grid[i][7] = 0; // quiet zone
+        grid[8][i + 1] = grid[i + 1][8] = 0; // format information zone
+    }
 
-      for (int i = 8; i < size; i++) { // timing patttern
-          grid[0][i] = grid[i][0] = (i % 2 == 0);
-      }
+    for (int i = 8; i < size; i++) { // timing patttern
+        grid[0][i] = grid[i][0] = (i % 2 == 0);
+    }
 
-      return grid;
-  }
-  std::vector<std::vector<int>> write (const std::string &txt, int ecc) {
+    return grid;
+}
+std::vector<std::vector<int>> MQR::write (const std::string &txt, int ecc) {
 
-      int version = M1;
-      const int mode = get_mode(txt);
+    int version = M1;
+    const int mode = get_mode(txt);
 
-      while (true) {
-          if (capacity[version][mode][ecc] >= txt.size()) break;
-          else version++;
-      }
+    while (true) {
+        if (capacity[version][mode][ecc] >= txt.size()) break;
+        else version++;
+    }
 
-      std::cout << "\n\n---encoding---\n\n";
-      std::cout << "Version    : " << version << "\n";
-      std::cout << "Mode       : " << info::mode[mode] << "\n";
+    std::cout << "\n\n---encoding---\n\n";
+    std::cout << "Version    : " << version << "\n";
+    std::cout << "Mode       : " << info::mode[mode] << "\n";
 
-      const int ndata = codewords[ecc][version]; // total of data codewords
-      const int ec = ecsize[ecc][version];   // number of ecc codewords by block
-      const int max_bits = ndata * 8;
+    const int ndata = codewords[ecc][version]; // total of data codewords
+    const int ec = ecsize[ecc][version];   // number of ecc codewords by block
+    const int max_bits = ndata * 8;
 
-      std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n";
-      std::cout << "Ecc mode   : " << info::level[ecc] << "\n";
-
-
-      std::string bits;
-      const std::vector<std::vector<int>> qr = MQr::make(version);
-      // bits = std::bitset<2>(get_mode(txt)).to_string();
-      bits = std::bitset<2>(mode).to_string();
-      bits = std::bitset<4>(txt.size()).to_string();
-      bits += encode(txt, info::mode[mode]);
-
-      while(bits.size() % 8 != 0) bits += '0';
-
-      for (int i = 0; bits.size() < max_bits; i++) {
-          bits += std::bitset<8>(padding[i % 2]).to_string();
-      }
+    std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n";
+    std::cout << "Ecc mode   : " << info::level[ecc] << "\n";
 
 
+    std::string bits;
+    const std::vector<std::vector<int>> qr = MQR::make(version);
+    // bits = std::bitset<2>(get_mode(txt)).to_string();
+    bits = std::bitset<2>(mode).to_string();
+    bits = std::bitset<4>(txt.size()).to_string();
+    bits += encode(txt, info::mode[mode]);
 
-      if (version == 1) {
-        // const int mode = 0;
-        // const int ecc = L;
+    while(bits.size() % 8 != 0) bits += '0';
 
-      } else if (version == 2) {
-        // const int mode = 0;
+    for (int i = 0; bits.size() < max_bits; i++) {
+        bits += std::bitset<8>(padding[i % 2]).to_string();
+    }
 
-      } else if (version == 3) {
-        // const int mode = 00;
-        // const int ecc = L;
+    if (version == 1) {
+      // const int mode = 0;
+      // const int ecc = L;
 
-      } else if (version == 4) {
-        // const int mode = 000;
-      }
+    } else if (version == 2) {
+      // const int mode = 0;
 
-      return qr;
-  }
+    } else if (version == 3) {
+      // const int mode = 00;
+      // const int ecc = L;
 
-  std::string read (const std::vector<std::vector<int>> &qr) {
+    } else if (version == 4) {
+      // const int mode = 000;
+    }
 
-      const int version = (qr.size() - 11) / 2;
-      std::cout << ":: decoding :: " << "\n";
-      std::cout << "   micro QR    " << "\n";
-      std::cout << "Version    : M" << version + 1 << "\n";
+    return qr;
+}
+std::string MQR::read (const std::vector<std::vector<int>> &qr) {
 
-      std::string str;
-      std::string src, bits;
+    const int version = (qr.size() - 11) / 2;
+    std::cout << ":: decoding :: " << "\n";
+    std::cout << "   micro QR    " << "\n";
+    std::cout << "Version    : M" << version + 1 << "\n";
 
-      // format information zone
-      for (int i = 1; i < 8; i++) str += qr[i][8] + '0';
-      for (int i = 8; i > 0; i--) str += qr[8][i] + '0';
+    std::string str;
+    std::string src, bits;
 
-      // xor with 100010001000101
-      const int format = dec_format_info(bin2int(str) ^ 0x4445) ;
+    // format information zone
+    for (int i = 1; i < 8; i++) {
+      str += qr[i][8] + '0';
+    }
+    for (int i = 8; i > 0; i--) {
+      str += qr[8][i] + '0';
+    }
 
-      if (vrlevel[(format >> 2)] != version) {
-          std::cout << "format error.\n";
-          return "";
-      }
-      // printf("%015b\n", format);
+    // xor with 100010001000101
+    const int format = dec_format_info(bin2int(str) ^ 0x4445) ;
+    // printf("%b\n", format);
+    printf(" %015b %015b\n", format, bin2int(str) ^ 0x4445);
 
-      const int ecc = eclevel[(format >> 2)];
-      const int mask = mqmask[(0b11 & format)];
-      const int ec = ecsize[ecc][version];
-      const int dc = codewords[ecc][version];
-      std::cout << "Mask       : " << mask << "\n";
-      std::cout << "Ecc mode   : " << ecc << "\n\n";
+    if (vrlevel[(format >> 2)] != version) {
+        printf("%b \n", format >> 2);
+        std::cout << "format error.\n";
+        // std::cout << vrlevel[(format >> 2)];
+        return "";
+    }
+    // printf("%015b\n", format);
 
-      // read qr code
-      for (auto &[x,y] : grid_pos(MQr::make(version), true)) {
-          src += (set_mask(mask, x, y) ^ qr[y][x]) + '0';
-      }
+    const int ecc = eclevel[(format >> 2)];
+    const int mask = mqmask[(0b11 & format)];
+    const int ec = ecsize[ecc][version];
+    const int dc = codewords[ecc][version];
+    std::cout << "Mask       : " << mask << "\n";
+    std::cout << "Ecc mode   : " << ecc << "\n\n";
 
-      std::cout << ec <<  " " << dc << "\n";
-      std::cout << "Decoding ecc block.\n" ;
-      // std::cout << "DEBUG :: " << dc + ec << "::\n";
-      const polynomial code (get_bits2(src, dc + ec));
-      const polynomial reed = rs_decode(code, ec);
+    // read qr code
+    for (auto &[x,y] : grid_pos(MQR::make(version), true)) {
+        src += (set_mask(mask, x, y) ^ qr[y][x]) + '0';
+    }
 
-      std::cout << show::simplified(code) << "\n" ;
-      std::cout << show::simplified(reed) << "\n" ;
+    std::cout << ec <<  " " << dc << "\n";
+    std::cout << "Decoding ecc block.\n" ;
+    // std::cout << "DEBUG :: " << dc + ec << "::\n";
+    const polynomial code (get_bits2(src, dc + ec));
+    const polynomial reed = rs_decode(code, ec);
 
-      if (reed.size() == 0)  {
-          std::cout << "can't decode qr : too much damage.\n";
-          return "";
-      }
+    std::cout << show::simplified(code) << "\n" ;
+    std::cout << show::simplified(reed) << "\n" ;
 
-      for (int i = 0; i < dc; i++) {
-          bits += std::bitset<8>(reed[i]).to_string();
-      }
+    if (reed.size() == 0)  {
+        std::cout << "can't decode qr : too much damage.\n";
+        return "";
+    }
 
-      const int mode = bin2int(bits.substr(0, 4)); // the message mode is inscribed in the first 4 bits
-      const int nbit = length_bits[version][mode]; // the message size is inscribed in the 8th, 9th or 10th following bits (depending of the version and te mode)
-      const int mlen = bin2int(bits.substr(4, nbit));
+    for (int i = 0; i < dc; i++) {
+        bits += std::bitset<8>(reed[i]).to_string();
+    }
 
-      std::cout << "Mode       : " << info::mode[mode] << "\n";
-      std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n\n";
+    const int mode = bin2int(bits.substr(0, 4)); // the message mode is inscribed in the first 4 bits
+    const int nbit = length_bits[version][mode]; // the message size is inscribed in the 8th, 9th or 10th following bits (depending of the version and te mode)
+    const int mlen = bin2int(bits.substr(4, nbit));
 
-      bits = bits.substr(4 + nbit);
+    std::cout << "Mode       : " << info::mode[mode] << "\n";
+    std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n\n";
 
-      return decode(bits, info::mode[mode], mlen);
-      return "";
-  }
+    bits = bits.substr(4 + nbit);
 
-};
-
+    return decode(bits, info::mode[mode], mlen);
+    return "";
+}
 
 int main () {
 
     //  (This is heuristical. Needs perspective correction, de-warping, re-clocking bad distortions, etc.)
-    cout << "\n\n\n";
     //        data  ,   ecc
     // M1 =  2 bytes,  3 bytes,
     // M2 =  4 bytes,  6 bytes ? L
@@ -410,32 +331,14 @@ int main () {
         {1,0,0,1,0,1,1,0,1,0,1,0,0,0,1}
     };
 
-    MQr::write("WIKIPEDIA.ORG",  MQr::L);
-    // std::string txt = MQr::read(wiki);
+    // MQR::write("WIKIPEDIA.ORG",  MQR::L);
+    // std::string txt = MQR::read(wiki);
 
-    for (int ecc = 0; ecc < 4; ecc++) {
-        for (int mask = 0; mask < 8; mask++) {
-            // if (((data_bits >> 8) &1) == 0) {
-            //     data_bits |= 1 << 8;
-            // }
-            // const int data_bits = bitset<15>(information[ecc][mask]).to_ulong();
-            // const int codewords = shift(data_bits ^ 0x5412, 0x537, 15, 5);
+    auto grid = MQR::make(MQR::M3);
 
-        }
-    }
-    // int i = 0;
-    // auto grid = MQr::make(MQr::M3);
-    //
-    // for (auto &[x,y] : grid_pos(grid, true)) {
-    //     grid[y][x] = i++  ;
-    // }
-    // for (int i = 0; i < grid.size(); i++) {
-    //     for (int j = 0; j < grid.size(); j++) {
-    //         printf("%3i ", grid[i][j]);
-    //     }
-    //
-    //     printf("\n");
-    // }
+    int version = MQR::M3;
+    int ecc = MQR::L;
+    int mask = 0;
 
     cout << "\nexit\n";
 }
