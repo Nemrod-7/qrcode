@@ -101,7 +101,7 @@ std::vector<int> getbyte (const std::string &bits, int st, int nd, int nbits) {
 }
 
 int roundup (double d) {
-    const int i = static_cast<int>(d); 
+    const int i = static_cast<int>(d);
     return (d - i) > 0 ? i + 1 : i;
 }
 bool set_mask (int level, int x, int y) {
@@ -436,8 +436,8 @@ std::vector<std::vector<int>> QR::write (const std::string &msg, int ecc) { // u
         for (int block = 0; block < nb; block++) {
             bits += std::bitset<8>(blocks[block][i]).to_string();
         }
-    } 
-   
+    }
+
     for (int i = 0; i < ec; i++) {
         for (int block = 0; block < nb; block++) {
             bits += std::bitset<8>(blocks[block][i + dc]).to_string();
@@ -458,7 +458,7 @@ std::vector<std::vector<int>> QR::write (const std::string &msg, int ecc) { // u
 
     // apply mask
     for (auto &[x,y] : path) {
-        grid[x][y] ^= set_mask(mask, x, y);
+        grid[y][x] ^= set_mask(mask, x, y);
     }
     // to implement : BCH (15 5) encoder
     // mask it (xor) with 101010000010010 (integer : 21522 hex :  0x5412)
@@ -515,7 +515,7 @@ std::string QR::read (const std::vector<std::vector<int>> &qr) { // up to versio
 
     std::cout << "for1 : " << fortemp[0] << "\n";
     const int ecc = (format >> 3);
-    const int mask = (0b11 & format);
+    const int mask = (0b111 & format);
 
     const int ndata = codewords[ecc][version]; // total of data codewords
     const int ec = ecsize[ecc][version];   // number of ecc codewords by block
@@ -578,6 +578,19 @@ std::string QR::read (const std::vector<std::vector<int>> &qr) { // up to versio
 
 int main() {
 
+  /*
+  -to do : improve codewords placement on the grid for multi correction blocks
+  (blocks of variable size)
+  */
+
+  std::vector<std::vector<int>> qr;
+  std::string msg = "https://jbirnick.github.io/";
+  // msg = "https://qrcode.com/";
+  qr = QR::write(msg, QR::H);
+  std::string txt = QR::read(qr);
+  std::cout << "text : [" << txt << "]\n";
+
+
     Image pic;
     // pic = Image::from_file ("pictures/Micro_QR_Example.pnm");
     // pic = Image::from_file ("pictures/ys2XE.pgm");
@@ -585,7 +598,7 @@ int main() {
     pic = simpl_thresh(pic);
     pic = crop(pic);
 
-    std::vector<std::vector<int>> qr = to_vec(pic);
+    qr = to_vec(pic);
     // std::vector<std::vector<int>> qr  = rescale(pic);
 
     // std::cout << grid(QR::make(1));

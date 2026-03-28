@@ -48,15 +48,18 @@ std::string encode (const std::string &msg, const std::string &mode) {
 
     if (mode == "NUMERIC") {
         std::string num = "   ";
+
         for (int i = 0; i < msg.size(); i += 3) {
             num[0] = msg[i+0];
             num[1] = (i + 1) < msg.size() ? (msg[i+1]) : 0;
             num[2] = (i + 2) < msg.size() ? (msg[i+2]) : 0;
 
-            switch(num.size()) {
-                case 1 : bits += std::bitset<4>(std::stoi(num)).to_string(); break;
-                case 2 : bits += std::bitset<2>(std::stoi(num)).to_string(); break;
-                case 3 : bits += std::bitset<10>(std::stoi(num)).to_string(); break;
+            if (num[1] == 0) {
+                bits += std::bitset<4>(std::stoi(num)).to_string();
+            } else if (num[2] == 0) {
+                bits += std::bitset<7>(std::stoi(num)).to_string();
+            } else {
+                bits += std::bitset<10>(std::stoi(num)).to_string();
             }
         }
     } else if (mode == "ALPHANUM") {
@@ -160,6 +163,26 @@ int MQR::get_mode (const std::string &src) {
 
     return mode;
 }
+int MQR::get_info_symbol (int version, int ecc) {
+    if (version == M1) {
+        return  0;
+    } else if (version == M2 && ecc == L) {
+        return  1;
+    } else if (version == M2 && ecc == M) {
+        return  2;
+    } else if (version == M3 && ecc == L) {
+        return  3;
+    } else if (version == M3 && ecc == M) {
+        return  4;
+    } else if (version == M4 && ecc == L) {
+        return  5;
+    } else if (version == M4 && ecc == M) {
+        return  6;
+    } else if (version == M4 && ecc == Q) {
+        return  7;
+    }
+    return -1;
+}
 std::vector<std::vector<int>> MQR::make (int version) { // M1, M2, M3, M4
     const int size = 2 * version + 11;
     std::vector<std::vector<int>> grid(size, std::vector<int>(size, 2));
@@ -187,45 +210,78 @@ std::vector<std::vector<int>> MQR::write (const std::string &txt, int ecc) {
     }
 
     std::cout << "\n\n---encoding---\n\n";
-    std::cout << "Version    : " << version << "\n";
+    std::cout << "Version    : M" << version + 1 << "\n";
     std::cout << "Mode       : " << info::mode[mode] << "\n";
-
-    const int ndata = codewords[ecc][version]; // total of data codewords
-    const int ec = ecsize[ecc][version];   // number of ecc codewords by block
-    const int max_bits = ndata * 8;
-
-    std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n";
     std::cout << "Ecc mode   : " << info::level[ecc] << "\n";
 
-
+    const int sym = get_info_symbol(version, ecc);
+    const int ec = ecsize[ecc][version];   // number of ecc codewords by block
+    const int dc = codewords[ecc][version];
     std::string bits;
-    const std::vector<std::vector<int>> qr = MQR::make(version);
-    // bits = std::bitset<2>(get_mode(txt)).to_string();
-    bits = std::bitset<2>(mode).to_string();
-    bits = std::bitset<4>(txt.size()).to_string();
+    // const int max_bits = ndata * 8;
+    std::vector<std::vector<int>> qr = MQR::make(version);
+    const auto path = grid_pos(qr, true);
+
+    if (version == M1) {
+
+    } else if (version == M2) {
+      bits = std::bitset<1>(mode).to_string();
+    } else if (version == M3) {
+      bits = std::bitset<2>(mode).to_string();
+    } else if (version == M4) {
+      bits = std::bitset<3>(mode).to_string();
+    }
+
+    // std::cout << ec <<  " " << dc << "\n";
+    bits += std::bitset<4>(txt.size()).to_string();
     bits += encode(txt, info::mode[mode]);
 
+    // special terminator for MQR
+    // if (version == M1) {
+    //     bits += std::bitset<3>(0).to_string();
+    // } else if (version == M2) {
+    //     bits += std::bitset<5>(0).to_string();
+    // } else if (version == M3) {
+    //     bits += std::bitset<7>(0).to_string();
+    // } else if (version == M4) {
+    //     bits += std::bitset<9>(0).to_string();
+    // }
+    bits += std::string(version * 2 + 3, '0');
+
     while(bits.size() % 8 != 0) bits += '0';
+    // ??? !! ???
+    // for (int i = 0; bits.size() < max_bits; i++) {
+    //     bits += std::bitset<8>(padding[i % 2]).to_string();
+    // }
 
-    for (int i = 0; bits.size() < max_bits; i++) {
-        bits += std::bitset<8>(padding[i % 2]).to_string();
+    // -=- RS Error Correction Codes -=-
+    polynomial data = get_bits2(bits, ec + dc);
+    polynomial reed = rs_encode(data, ec);
+
+    // std::cout << show::simplified(data) << "\n";
+    // std::cout << show::simplified(reed) << "\n";
+
+    for (int i = dc; i < reed.size(); i++) {
+        bits += std::bitset<8>(reed[i]).to_string();
     }
 
-    if (version == 1) {
-      // const int mode = 0;
-      // const int ecc = L;
-
-    } else if (version == 2) {
-      // const int mode = 0;
-
-    } else if (version == 3) {
-      // const int mode = 00;
-      // const int ecc = L;
-
-    } else if (version == 4) {
-      // const int mode = 000;
+    for (int i = 0; i < path.size(); i++) {
+        auto &[x,y] = path[i];
+        qr[y][x] = (i < bits.size()) ? bits[i] - 48 : 0 ;
     }
 
+    const int mask = 1;
+    const int bch = gen_format_info(sym << 2 | mask) ^ 0x4445;
+
+    for (int i = 0; i < 8; i++) {
+        qr[i + 1][8] = (bch >> i) & 1;
+        qr[8][i + 1] = (bch >> (14-i)) & 1;
+    }
+
+    for (auto &[x,y] : path) {
+      qr[y][x] ^= set_mask(mqmask[mask], x, y);
+    }
+    // cout << grid(qr);
     return qr;
 }
 std::string MQR::read (const std::vector<std::vector<int>> &qr) {
@@ -239,20 +295,23 @@ std::string MQR::read (const std::vector<std::vector<int>> &qr) {
     std::string src, bits;
 
     // format information zone
-    for (int i = 1; i < 8; i++) {
-      str += qr[i][8] + '0';
-    }
-    for (int i = 8; i > 0; i--) {
-      str += qr[8][i] + '0';
-    }
+    for (int i = 1; i < 8; i++) { str += qr[8][i] + '0'; }
+    for (int i = 8; i > 0; i--) { str += qr[i][8] + '0'; }
 
     // xor with 100010001000101
     const int format = dec_format_info(bin2int(str) ^ 0x4445) ;
-    // printf("%b\n", format);
-    printf(" %015b %015b\n", format, bin2int(str) ^ 0x4445);
 
+    // for (int i = 0; i < 32; i++) {
+    //     int fmt = gen_format_info(i);
+    //
+    //     if (fmt == (bin2int(str) ^ 0x4445)) {
+    //       printf("Debug :: ");
+    //       printf("%05b %05b\n", format, i);
+    //
+    //     }
+    // }
+    // printf(" %015b %015b\n", format, bin2int(str) ^ 0x4445);
     if (vrlevel[(format >> 2)] != version) {
-        printf("%b \n", format >> 2);
         std::cout << "format error.\n";
         // std::cout << vrlevel[(format >> 2)];
         return "";
@@ -260,7 +319,7 @@ std::string MQR::read (const std::vector<std::vector<int>> &qr) {
     // printf("%015b\n", format);
 
     const int ecc = eclevel[(format >> 2)];
-    const int mask = mqmask[(0b11 & format)];
+    const int mask = 0b11 & format;
     const int ec = ecsize[ecc][version];
     const int dc = codewords[ecc][version];
     std::cout << "Mask       : " << mask << "\n";
@@ -268,7 +327,7 @@ std::string MQR::read (const std::vector<std::vector<int>> &qr) {
 
     // read qr code
     for (auto &[x,y] : grid_pos(MQR::make(version), true)) {
-        src += (set_mask(mask, x, y) ^ qr[y][x]) + '0';
+        src += (set_mask(mqmask[mask], x, y) ^ qr[y][x]) + '0';
     }
 
     std::cout << ec <<  " " << dc << "\n";
@@ -277,8 +336,8 @@ std::string MQR::read (const std::vector<std::vector<int>> &qr) {
     const polynomial code (get_bits2(src, dc + ec));
     const polynomial reed = rs_decode(code, ec);
 
-    std::cout << show::simplified(code) << "\n" ;
-    std::cout << show::simplified(reed) << "\n" ;
+    // std::cout << show::simplified(code) << "\n" ;
+    // std::cout << show::simplified(reed) << "\n" ;
 
     if (reed.size() == 0)  {
         std::cout << "can't decode qr : too much damage.\n";
@@ -289,7 +348,17 @@ std::string MQR::read (const std::vector<std::vector<int>> &qr) {
         bits += std::bitset<8>(reed[i]).to_string();
     }
 
-    const int mode = bin2int(bits.substr(0, 4)); // the message mode is inscribed in the first 4 bits
+    const int mode = bin2int(bits.substr(0, version));
+
+    // if (version == M1) {
+    //     mode = bin2int(bits.substr(0, 0));
+    // } else if (version == M2) {
+    //     mode = bin2int(bits.substr(0, 1));
+    // } else if (version == M3) {
+    //     mode = bin2int(bits.substr(0, 2));
+    // } else if (version == M4) {
+    //     mode = bin2int(bits.substr(0, 3));
+    // }
     const int nbit = length_bits[version][mode]; // the message size is inscribed in the 8th, 9th or 10th following bits (depending of the version and te mode)
     const int mlen = bin2int(bits.substr(4, nbit));
 
@@ -329,32 +398,11 @@ int main () {
         {1,0,0,1,0,1,1,0,1,0,1,0,0,0,1}
     };
 
+    auto qr = MQR::write("01234567",  MQR::L);
     // MQR::write("WIKIPEDIA.ORG",  MQR::L);
-    // std::string txt = MQR::read(wiki);
 
-    auto grid = MQR::make(MQR::M3);
+    std::string txt = MQR::read(qr);
 
-    int version = MQR::M3;
-    int ecc = MQR::L;
-    int mask = 0;
-
-    for (int code = 0; code < 8; code++) {
-        int info = code ;
-        int mask = code >> 2;
-
-        int fmt = code << 2;
-
-        version = MQR::vrlevel[info];
-        ecc = MQR::eclevel[info];
-
-        int xored = gen_format_info(fmt) ^ 0x4445;
-        // printf("%05b %03b %02b \n", code, info, mask);
-
-        // int xored = ((code << 10) ^ 0x4445) >> 10;
-        printf(" %05b %05b  ", fmt, xored >> 10);
-        printf("M%i %s",  version + 1, MQR::info::level[ecc].c_str());
-        printf("\n");
-    }
 
 
     cout << "\nexit\n";

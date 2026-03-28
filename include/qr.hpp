@@ -131,7 +131,7 @@ namespace MQR {
   // the first 3 bits identify the version and the error eorrection used.
   // ie : 000 = (M1 L) 011 = (M3, L)
   // there is no logic behind that. Just take the infor from the two tables below.
-  //                   info =  0  1  2  3  4  5  6  7 
+  //                   info =  0  1  2  3  4  5  6  7
   const unsigned vrlevel[8] = {M1,M2,M2,M3,M3,M4,M4,M4};
   const unsigned eclevel[8] = { L, L, M, L, M, L, M, Q};
 
@@ -182,6 +182,7 @@ namespace MQR {
   };
 
   int get_mode (const std::string &src);
+  int get_info_symbol (int version, int ecc);
   std::vector<std::vector<int>> make (int version);
   std::vector<std::vector<int>> write (const std::string &txt, int ecc);
   std::string read (const std::vector<std::vector<int>> &qr);
