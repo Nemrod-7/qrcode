@@ -5,13 +5,11 @@
 
 #include "include/grid.hpp"
 #include "include/rs.hpp"
-#include "QR2.hpp"
+#include "include/qr.hpp"
 
 using namespace std;
 
-const std::string alnum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
-const unsigned int padding[2] = {0xec, 0x11}; // bin: 11101100 00010001
-
+//////////////////////////////////// general /////////////////////////////////////
 static std::string grid (const std::vector<std::vector<int>> &grid) {
     std::string os;
     for (int i = 0; i < grid.size(); i++) {
@@ -339,6 +337,25 @@ int main () {
     int version = MQR::M3;
     int ecc = MQR::L;
     int mask = 0;
+
+    for (int code = 0; code < 8; code++) {
+        int info = code ;
+        int mask = code >> 2;
+
+        int fmt = code << 2;
+
+        version = MQR::vrlevel[info];
+        ecc = MQR::eclevel[info];
+
+        int xored = gen_format_info(fmt) ^ 0x4445;
+        // printf("%05b %03b %02b \n", code, info, mask);
+
+        // int xored = ((code << 10) ^ 0x4445) >> 10;
+        printf(" %05b %05b  ", fmt, xored >> 10);
+        printf("M%i %s",  version + 1, MQR::info::level[ecc].c_str());
+        printf("\n");
+    }
+
 
     cout << "\nexit\n";
 }

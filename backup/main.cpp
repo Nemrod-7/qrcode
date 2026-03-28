@@ -100,10 +100,6 @@ std::vector<int> getbyte (const std::string &bits, int st, int nd, int nbits) {
     return v;
 }
 
-int roundup (double d) {
-    const int i = static_cast<int>(d); 
-    return (d - i) > 0 ? i + 1 : i;
-}
 bool set_mask (int level, int x, int y) {
     switch(level) {
         case 0  : return (y + x) % 2 == 0;
@@ -145,7 +141,7 @@ int evaluate (const std::vector<std::vector<int>> &grid) {
 
     return maxv;
 }
-int choose_mask (const std::vector<std::vector<int>> &grid) {
+int mk_mask (const std::vector<std::vector<int>> &grid) {
 
     const auto path = grid_pos(grid);
     int maxv = 9999, mask = 0;
@@ -390,18 +386,14 @@ std::vector<std::vector<int>> QR::write (const std::string &msg, int ecc) { // u
     if (version == 0) return {};
 
     const int ndata = codewords[ecc][version]; // total of data codewords
-    const int nb = err_blocks[ecc][version];   // number of ecc blocks
-    const int ec = ecsize[ecc][version];       // number of ecc codewords by block
-    const int dc = roundup(ndata / (double) nb); // number of data codeword for each ecc block
-    std::vector<polynomial> blocks(nb);
+    const int ec = ecsize[ecc][version];   // number of ecc codewords by block
+    const int nb = err_blocks[ecc][version]; // number of ecc blocks
+    const int dc = ndata / nb;               // number of data codeword for each ecc block
 
+    std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n";
     std::cout << "Ecc mode   : " << info::level[ecc] << "\n";
-    std::cout << "Ecc  cdwd  : " << ec * nb << "\n";
-    std::cout << "Data cdwd  : " << dc * nb << "\n";
-    std::cout << "Codewords  : " << (ndata + ec * nb) << "\n";
-
-    // std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n";
-    // std::cout << "Ecc blocks : " << nb << "\n";
+    std::cout << "Ecc blocks : " << nb << "\n";
+    std::cout << "ndata blocks : " << dc << "\n";
     auto grid = make(version);
     const auto path = grid_pos(grid);
     const auto info = info_pos(17 + version * 4);
@@ -417,42 +409,32 @@ std::vector<std::vector<int>> QR::write (const std::string &msg, int ecc) { // u
     // const int fill = capacity[version][mode][ecc] - msg.size() + 4;
     // for (int i = 0; i < std::min(4, fill); i++) bits += '0';
     while(bits.size() % 8 != 0) bits += '0';
+    const int max_bits = ndata * 8;
 
-    for (int i = 0; bits.size() < ndata * 8; i++) {
+    for (int i = 0; bits.size() < max_bits; i++) {
         bits += std::bitset<8>(padding[i % 2]).to_string();
     }
 
-    // -=- RS Error Correction Code encoding -=-
-    for (int i = 0; i < nb; i++) {
-        std::string sub = bits.substr(i * dc * 8, dc * 8);
+    // make the reed-solomon polynomial for each block
+    for (int cluster = 0; cluster < nb; cluster++) {
+        std::string sub = bits.substr(cluster * dc * 8, dc * 8);
         polynomial data = get_bits2(sub, ec + dc);
-        blocks[i] = rs_encode(data, ec);
-        std::cout << "block " << i << " :: " << show::simplified(blocks[i]) << "\n";
-    }
+        polynomial reed = rs_encode(data, ec);
 
-    bits = "";
-    // place the final codewords
-    for (int i = 0; i < dc; i++) {
-        for (int block = 0; block < nb; block++) {
-            bits += std::bitset<8>(blocks[block][i]).to_string();
-        }
-    } 
-   
-    for (int i = 0; i < ec; i++) {
-        for (int block = 0; block < nb; block++) {
-            bits += std::bitset<8>(blocks[block][i + dc]).to_string();
+        std::cout << "block " << cluster << " :: " << show::simplified(reed) << "\n";
+        for (int i = dc; i < reed.size(); i++) {
+            bits += std::bitset<8>(reed[i]).to_string();
         }
     }
 
-    // std::cout << "binary size : " << bits.size() << "\n\n";
+    std::cout << "binary size : " << bits.size() << "\n\n";
     // write bits on the grid
     for (int i = 0; i < path.size(); i++) {
         auto &[x,y] = path[i];
         grid[y][x] = (i < bits.size()) ? bits[i] - 48 : 0 ;
     }
 
-
-    const int mask = choose_mask(grid);
+    int mask = mk_mask(grid);
 
     std::cout << "Mask       : " << mask << "\n";
 
@@ -464,7 +446,6 @@ std::vector<std::vector<int>> QR::write (const std::string &msg, int ecc) { // u
     // mask it (xor) with 101010000010010 (integer : 21522 hex :  0x5412)
     // std::string infos = (gen_format_info((ecc << 3) | mask) ^ 0x5412);
 
-    std::cout << "format     : " << information[ecc][mask] << "\n";
     // write format infos on the grid
     for (int i = 0; i < info.size(); i++) {
         auto &[x,y] = info[i];
@@ -513,57 +494,50 @@ std::string QR::read (const std::vector<std::vector<int>> &qr) { // up to versio
         std::cout << "The format information has no errors\n";
     }
 
-    std::cout << "for1 : " << fortemp[0] << "\n";
     const int ecc = (format >> 3);
     const int mask = (0b11 & format);
+    std::cout << QR::information[ecc][mask] << "\n";
+    std::cout << fortemp[0] << "\n";
 
+    // printf("DEBUG %05b %i %i \n", format, ecc, mask);
     const int ndata = codewords[ecc][version]; // total of data codewords
     const int ec = ecsize[ecc][version];   // number of ecc codewords by block
     const int nb = err_blocks[ecc][version]; // number of ecc blocks
+    const int dc = ndata / nb;               // number of data codeword for each ecc block
 
     std::cout << "Mask       : " << mask << "\n";
-    std::cout << "Ecc mode   : " << info::level[ecc] << "\n";
+    std::cout << "Ecc mode   : " << info::level[ecc] << "\n\n";
     std::cout << "Ecc blocks : " << nb << "\n";
 
-    if (nb == 0) {
-        std::cout << "Invalid QRcode.\n";
-        return "";
-    }
-    const int dc = roundup(ndata / (double) nb);               // number of data codeword for each ecc block
-
-    // read qr code bits
+    // read qr code
     for (auto &[x,y] : grid_pos(make(version))) {
         src += (set_mask(mask, x, y) ^ qr[y][x]) + '0';
     }
-
+    // cout << "size : " << src.size() << "\n";
     // reed-solomon decoding :
     // [              block 1            ][              block ...           ]
     // [[data polynomial][ecc polynomial]] [[data polynomial][ecc polynomial]]
 
     for (int block = 0; block < nb; block++) {
-        polynomial code;
+        const std::string sub1 = src.substr(block * dc * 8, dc * 8); // binary data block
+        const std::string sub2 = src.substr(ndata * 8 + block * ec * 8, ec * 8); // binary ecc block
 
-        for (int j = 0; j < dc; j++) {
-            code.push_back(stoi(src.substr((j * nb + block) * 8, 8), nullptr, 2));
-        }
-
-        for (int j = 0; j < ec; j++) {
-            code.push_back(stoi(src.substr((j * nb + block + dc * nb) * 8, 8), nullptr, 2));
-        }
-        std::cout << "Ecc block " << block << " :: " ;
-        std::cout << show::simplified(code) << "\n" ;
-
+        std::cout << "Decoding ecc block : " << block << "\n" ;
+        polynomial code(get_bits2(sub1 + sub2, dc + ec));
         polynomial reed = rs_decode(code, ec);
-        // // std::cout << show::simplified(reed) << "\n\n" ;
+
         if (reed.size() == 0)  {
             std::cout << "can't decode qr : too much damage.\n";
             return "";
         }
+        // std::cout << show::simplified(code) << "\n\n" ;
+        // std::cout << show::simplified(reed) << "\n\n" ;
 
         for (int i = 0; i < dc; i++) {
             bits += std::bitset<8>(reed[i]).to_string();
         }
     }
+
     const int mode = bin2int(bits.substr(0, 4)); // the message mode is inscribed in the first 4 bits
     const int nbit = get_len(version, mode); // the message size is inscribed in the 8th, 9th or 10th following bits (depending of the version and te mode)
     const int mlen = bin2int(bits.substr(4, nbit));
@@ -575,6 +549,7 @@ std::string QR::read (const std::vector<std::vector<int>> &qr) { // up to versio
 
     return decode(bits, info::mode[mode], mlen);
 }
+
 
 int main() {
 
