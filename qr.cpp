@@ -4,10 +4,11 @@
 #include <set>
 #include <bitset>
 
+#include "include/qr.hpp"
 #include "include/rs.hpp"
 #include "include/grid.hpp"
 #include "include/utils.hpp"
-#include "include/qr.hpp"
+#include "include/image.hpp"
 
 /* to implement :
     ECI encoding and decoding
@@ -87,23 +88,23 @@ std::vector<std::vector<int>> to_vec (const Image &pic) { // place all qr data b
 
   return qr;
 }
-////////////////////////////////////////////////////////////////////////////////
 
 /////////////////////////////// general ////////////////////////////////////
+std::string getbinary (const std::string &bits, int st, int nbits) {
+    return std::to_string( bin2int(bits.substr(st, nbits)) );
+}
 std::vector<int> getbyte (const std::string &bits, int st, int nd, int nbits) {
     std::vector<int> v;
     for (int i = st; i < nd; i += nbits) {
-        int ii = stoi(bits.substr(i, nbits), nullptr, 2);
-        v.push_back(ii);
+        v.push_back(bin2int(bits.substr(i, nbits)));
     }
     return v;
 }
 
-int roundup(double d) {
-    const int i = static_cast<int>(d); 
+int roundup (double d) {
+    const int i = static_cast<int>(d);
     return (d - i) > 0 ? i + 1 : i;
 }
-
 bool set_mask (int level, int x, int y) {
     switch(level) {
         case 0  : return (y + x) % 2 == 0;
@@ -172,15 +173,18 @@ std::string encode (const std::string &msg, const std::string &mode) {
 
     if (mode == "NUMERIC") {
         std::string num = "   ";
+
         for (int i = 0; i < msg.size(); i += 3) {
             num[0] = msg[i+0];
             num[1] = (i + 1) < msg.size() ? (msg[i+1]) : 0;
             num[2] = (i + 2) < msg.size() ? (msg[i+2]) : 0;
 
-            switch(num.size()) {
-                case 1 : bits += std::bitset<4>(std::stoi(num)).to_string(); break;
-                case 2 : bits += std::bitset<2>(std::stoi(num)).to_string(); break;
-                case 3 : bits += std::bitset<10>(std::stoi(num)).to_string(); break;
+            if (num[1] == 0) {
+                bits += std::bitset<4>(std::stoi(num)).to_string();
+            } else if (num[2] == 0) {
+                bits += std::bitset<7>(std::stoi(num)).to_string();
+            } else {
+                bits += std::bitset<10>(std::stoi(num)).to_string();
             }
         }
     } else if (mode == "ALPHANUM") {
@@ -224,9 +228,19 @@ std::string decode (const std::string &bits, const std::string &mode, int size) 
     std::string txt;
 
     if (mode == "NUMERIC") {
-        for (auto &it : getbyte(bits, 0, (size * 10) / 3, 10)) {
-            txt += std::to_string(it);
-        }
+      std::string tmp;
+      const int end = static_cast<int>(size / 3);
+
+      for (int i = 0; i < end; i++) {
+          tmp = getbinary(bits, i * 10, 10);
+
+          txt += std::string((3 - tmp.size()), '0') + tmp;
+      }
+
+      switch (size % 3) {
+          case 1 : txt += getbinary(bits, end * 10, 4); break;
+          case 2 : txt += getbinary(bits, end * 10, 7); break;
+      }
     } else if (mode == "ALPHANUM") {
         const int end = size / 2 * 11;
 
@@ -265,10 +279,18 @@ std::string decode (const std::string &bits, const std::string &mode, int size) 
         */
     }
 
-
     return txt;
 }
 ////////////////////////////// QR specific ///////////////////////////////////
+int QR::get_len (int version, int mode) {
+    if (version < 10) {
+        return length_bits[0][mode];
+    } else if (version < 27) {
+        return length_bits[1][mode];
+    } else {
+        return length_bits[2][mode];
+    }
+}
 int QR::get_mode (const std::string &src) {
 
     enum MODE mode = NUMERIC;
@@ -282,15 +304,6 @@ int QR::get_mode (const std::string &src) {
     }
 
     return mode;
-}
-int QR::get_len (int version, int mode) {
-    if (version < 10) {
-        return length_bits[0][mode];
-    } else if (version < 27) {
-        return length_bits[1][mode];
-    } else {
-        return length_bits[2][mode];
-    }
 }
 int QR::get_version (const std::vector<std::vector<int>> &qr) {
     int byte[2] = {0,0};
@@ -436,8 +449,8 @@ std::vector<std::vector<int>> QR::write (const std::string &msg, int ecc) { // u
         for (int block = 0; block < nb; block++) {
             bits += std::bitset<8>(blocks[block][i]).to_string();
         }
-    } 
-   
+    }
+
     for (int i = 0; i < ec; i++) {
         for (int block = 0; block < nb; block++) {
             bits += std::bitset<8>(blocks[block][i + dc]).to_string();
@@ -458,7 +471,7 @@ std::vector<std::vector<int>> QR::write (const std::string &msg, int ecc) { // u
 
     // apply mask
     for (auto &[x,y] : path) {
-        grid[x][y] ^= set_mask(mask, x, y);
+        grid[y][x] ^= set_mask(mask, x, y);
     }
     // to implement : BCH (15 5) encoder
     // mask it (xor) with 101010000010010 (integer : 21522 hex :  0x5412)
@@ -515,7 +528,7 @@ std::string QR::read (const std::vector<std::vector<int>> &qr) { // up to versio
 
     std::cout << "for1 : " << fortemp[0] << "\n";
     const int ecc = (format >> 3);
-    const int mask = (0b11 & format);
+    const int mask = (0b111 & format);
 
     const int ndata = codewords[ecc][version]; // total of data codewords
     const int ec = ecsize[ecc][version];   // number of ecc codewords by block
@@ -576,16 +589,55 @@ std::string QR::read (const std::vector<std::vector<int>> &qr) { // up to versio
     return decode(bits, info::mode[mode], mlen);
 }
 
+int main () {
 
-int main() {
+  /*
+  -to do : improve codewords placement on the grid for multi correction blocks
+  (blocks of variable size)
+  */
 
-
-    // std::cout << grid(QR::make(1));
+    std::vector<std::vector<int>> qr;
     std::string msg = "https://jbirnick.github.io/";
     // msg = "https://qrcode.com/";
-    auto qr = QR::write(msg, QR::H);
-    std::string txt = QR::read(qr);
-    std::cout << "[" << txt << "]";
+    qr = QR::write(msg, QR::H);
+
+    // std::string txt = QR::read(qr);
+    // std::cout << "text : [" << txt << "]\n";
+
+
+    // Image pic;
+    // // pic = Image::from_file ("pictures/Micro_QR_Example.pnm");
+    // // pic = Image::from_file ("pictures/ys2XE.pgm");
+    // pic = Image::from_file ("pictures/ex2.pnm");
+    // pic = simpl_thresh(pic);
+    // pic = crop(pic);
+    //
+    // qr = to_vec(pic);
+    // // std::vector<std::vector<int>> qr  = rescale(pic);
+    // // std::cout << grid(QR::make(1));
+    //
+    // if (qr.size() < 20) {
+    //     // Micro QR
+    //
+    // } else {
+    //     // QR code
+    //     std::vector<std::vector<int>> pattern(7, std::vector<int>(7));
+    //     const int size = qr.size();
+    //     int index = 0;
+    //     finder(pattern, 3, 3);
+    //
+    //     while (!identify(0, 0, qr, pattern) || !identify(size - 7, 0, qr, pattern) || !identify(0, size - 7, qr, pattern)) {
+    //         if (index > 4) {
+    //             std::cout << "can't find orientation.\n";
+    //             break;
+    //         }
+    //         qr = rotate(qr);
+    //         index++;
+    //     }
+    //
+    //     std::string txt = QR::read(qr);
+    //     std::cout << "text : [" << txt << "]";
+    // }
 
 
     std::cout << "\nexit\n";

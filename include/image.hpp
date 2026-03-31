@@ -9,7 +9,6 @@
 using u8 = unsigned char;
 enum {black = 0, white = 255 };
 
-
 struct Image { // Image structure
 
     int width, height;

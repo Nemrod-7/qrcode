@@ -10,7 +10,7 @@
 using namespace std;
 
 //////////////////////////////////// general /////////////////////////////////////
-static std::string grid (const std::vector<std::vector<int>> &grid) {
+static std::string showgrid (const std::vector<std::vector<int>> &grid) {
     std::string os;
     for (int i = 0; i < grid.size(); i++) {
         for (int j = 0; j < grid.size(); j++) {
@@ -21,6 +21,9 @@ static std::string grid (const std::vector<std::vector<int>> &grid) {
     return os;
 }
 
+std::string getbinary (const std::string &bits, int st, int nbits) {
+    return std::to_string( bin2int(bits.substr(st, nbits)) );
+}
 std::vector<int> getbyte (const std::string &bits, int st, int nd, int nbits) {
     std::vector<int> v;
     for (int i = st; i < nd; i += nbits) {
@@ -29,6 +32,7 @@ std::vector<int> getbyte (const std::string &bits, int st, int nd, int nbits) {
     }
     return v;
 }
+
 bool set_mask(int level, int x, int y) {
     switch(level) {
         case 0  : return (y + x) % 2 == 0;
@@ -103,9 +107,19 @@ std::string decode (const std::string &bits, const std::string &mode, int size) 
     std::string txt;
 
     if (mode == "NUMERIC") {
-        for (auto &it : getbyte(bits, 0, (size * 10) / 3, 10)) {
-            txt += std::to_string(it);
-        }
+      std::string tmp;
+      const int end = static_cast<int>(size / 3);
+
+      for (int i = 0; i < end; i++) {
+          tmp = getbinary(bits, i * 10, 10);
+
+          txt += std::string((3 - tmp.size()), '0') + tmp;
+      }
+
+      switch (size % 3) {
+          case 1 : txt += getbinary(bits, end * 10, 4); break;
+          case 2 : txt += getbinary(bits, end * 10, 7); break;
+      }
     } else if (mode == "ALPHANUM") {
         const int end = size / 2 * 11;
 
@@ -143,7 +157,6 @@ std::string decode (const std::string &bits, const std::string &mode, int size) 
           specific industry application previously agreed with AIM Inc.
         */
     }
-
 
     return txt;
 }
@@ -272,7 +285,7 @@ std::vector<std::vector<int>> MQR::write (const std::string &txt, int ecc) {
 
     const int mask = 1;
     const int bch = gen_format_info(sym << 2 | mask) ^ 0x4445;
-
+    // std::cout << std::bitset<15>(bch) << "\n";
     for (int i = 0; i < 8; i++) {
         qr[i + 1][8] = (bch >> i) & 1;
         qr[8][i + 1] = (bch >> (14-i)) & 1;
@@ -287,7 +300,7 @@ std::vector<std::vector<int>> MQR::write (const std::string &txt, int ecc) {
 std::string MQR::read (const std::vector<std::vector<int>> &qr) {
 
     const int version = (qr.size() - 11) / 2;
-    std::cout << ":: decoding :: " << "\n";
+    std::cout << "\n:: decoding ::\n";
     std::cout << "   micro QR    " << "\n";
     std::cout << "Version    : M" << version + 1 << "\n";
 
@@ -300,7 +313,7 @@ std::string MQR::read (const std::vector<std::vector<int>> &qr) {
 
     // xor with 100010001000101
     const int format = dec_format_info(bin2int(str) ^ 0x4445) ;
-
+    // std::cout << std::bitset<15>(bin2int(str)) << "\n";
     // for (int i = 0; i < 32; i++) {
     //     int fmt = gen_format_info(i);
     //
@@ -323,14 +336,14 @@ std::string MQR::read (const std::vector<std::vector<int>> &qr) {
     const int ec = ecsize[ecc][version];
     const int dc = codewords[ecc][version];
     std::cout << "Mask       : " << mask << "\n";
-    std::cout << "Ecc mode   : " << ecc << "\n\n";
+    std::cout << "Ecc mode   : " << info::level[ecc] << "\n";
 
     // read qr code
     for (auto &[x,y] : grid_pos(MQR::make(version), true)) {
         src += (set_mask(mqmask[mask], x, y) ^ qr[y][x]) + '0';
     }
 
-    std::cout << ec <<  " " << dc << "\n";
+    // std::cout << ec <<  " " << dc << "\n";
     std::cout << "Decoding ecc block.\n" ;
     // std::cout << "DEBUG :: " << dc + ec << "::\n";
     const polynomial code (get_bits2(src, dc + ec));
@@ -360,12 +373,11 @@ std::string MQR::read (const std::vector<std::vector<int>> &qr) {
     //     mode = bin2int(bits.substr(0, 3));
     // }
     const int nbit = length_bits[version][mode]; // the message size is inscribed in the 8th, 9th or 10th following bits (depending of the version and te mode)
-    const int mlen = bin2int(bits.substr(4, nbit));
+    const int mlen = bin2int(bits.substr(version, nbit));
+    bits = bits.substr(version + nbit);
 
     std::cout << "Mode       : " << info::mode[mode] << "\n";
-    std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n\n";
-
-    bits = bits.substr(4 + nbit);
+    // std::cout << "Capacity   : " << capacity[version][mode][ecc] <<  "\n\n";
 
     return decode(bits, info::mode[mode], mlen);
     return "";
@@ -398,11 +410,12 @@ int main () {
         {1,0,0,1,0,1,1,0,1,0,1,0,0,0,1}
     };
 
-    auto qr = MQR::write("01234567",  MQR::L);
-    // MQR::write("WIKIPEDIA.ORG",  MQR::L);
+    auto qr = MQR::make(MQR::M4);
 
-    std::string txt = MQR::read(qr);
-
+    // auto qr = MQR::write("01234567",  MQR::L);
+    // // MQR::write("WIKIPEDIA.ORG",  MQR::L);
+    // std::string txt = MQR::read(qr);
+    // std::cout << "\n[" << txt << "]\n";
 
 
     cout << "\nexit\n";

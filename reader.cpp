@@ -29,6 +29,7 @@ int main() {
         std::cout << "Could not read the image: " << path << std::endl;
         return 1;
     }
+
     // printf("width %i height %i\n", img.cols, img.rows);
     // cv::Mat resizedAbsolute;
     // cv::Size newSize(50, 50); // width=300, height=200
@@ -36,10 +37,9 @@ int main() {
 
     // Option 2: Resize by scale factor (relative size)
     // cv::Mat resizedScale;
-    // double scaleX = 1.0 /6.0;
-    // double scaleY = 1.0 /6.0;
+    // double scaleX = 1.0 / 6.0;
+    // double scaleY = 1.0 / 6.0;
     // cv::resize(img, resizedScale, cv::Size(), scaleX, scaleY, cv::INTER_LINEAR);
-
 
     // Define line color (B, G, R) and thickness
     cv::Scalar lineColor(0, 255, 0); // Green

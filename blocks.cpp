@@ -1,15 +1,12 @@
 #include <iostream>
 #include <vector>
 #include "include/qr.hpp"
-#include "include/rs.hpp"
+// #include "include/rs.hpp"
+using namespace std;
 
-int roundup(double d) {
-    const int i = static_cast<int>(d); 
-    return (d - i) > 0 ? i + 1 : i;
-}
 
 void write_blocks(int dc, int ec, int nb, const std::vector<std::vector<int>> &blocks) {
-    
+
     for (int i = 0; i < dc; i++) {
         for (int block = 0; block < nb; block++) {
             const int ix = i + block * dc ;
@@ -17,7 +14,7 @@ void write_blocks(int dc, int ec, int nb, const std::vector<std::vector<int>> &b
             // printf("[%3i %3i]", block, i);
         }
         printf("\n");
-    } 
+    }
     printf("\n");
     for (int i = 0; i < ec; i++) {
         for (int block = 0; block < nb; block++) {
@@ -52,24 +49,32 @@ void read_blocks(int dc, int ec, int nb, const std::vector<int> &bytes) {
 
 int main () {
 
+    const int ecc = QR::H;
+    const int version = 5;
 
-    int nsize  = 134;
-    int ndata = 46;
-    int nerro = 88;
-    int nb = 4;
-    std::vector<int> bytes (nsize);
+    const int ndata = QR::codewords[ecc][version];
+    const int nb = QR::err_blocks[ecc][version];
+    const int ec = QR::ecsize[ecc][version];
+    const int rem = ndata % nb, lim = (nb - rem), end = ndata / nb;
+    // [11,22] // [11,22] // [12,22] // [12,22]
+    for (int block = 0; block < nb; block++) {
+        int dc = block < lim ? end : end + 1;
+        int total = dc + ec;
+        cout << dc << " ";
+    }
+    cout << endl;
 
-    const int dc = roundup(ndata / (double)nb); 
-    const int ec = roundup(nerro / (double)nb); 
-    // printf("%i ", nerro + ndata);
-    // write_blocks(dc, ec, nb, {});
-    // read_blocks(dc, ec, nb, bytes);
-    int version = 4;
-    int ecc = QR::H;
-    int mask = 0;
+    for (int i = 0; i < (end +  1); i++) {
+        for (int block = 0; block < nb; block++) {
+            const int ix = i + block * (end +  1) ;
 
 
-    const int infos = (gen_format_info((ecc << 3) | mask) ^ 0x5412);
+            printf("%3i ", ix + 1);
+            // printf("[%3i %3i]", block, i);
+        }
+        printf("\n");
+    }
 
-    std::cout << QR::information[ecc][mask] << "\n";
+
+
 }
