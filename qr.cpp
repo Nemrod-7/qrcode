@@ -334,7 +334,6 @@ int QR::get_version (const std::vector<std::vector<int>> &qr) {
     return -1;
 }
 
-
 std::vector<std::vector<int>> QR::make (int version) {
       const int size = 17 + version * 4;
       std::vector<std::vector<int>> grid(size, std::vector<int>(size, 2));
@@ -553,15 +552,14 @@ std::string QR::read (const std::vector<std::vector<int>> &qr) { // up to versio
     for (auto &[x,y] : grid_pos(make(version))) {
         src += (set_mask(mask, x, y) ^ qr[y][x]) + '0';
     }
-    
+
     // reed-solomon decoding :
     // [              block 1            ][              block ...           ]
     // [[data polynomial][ecc polynomial]] [[data polynomial][ecc polynomial]]
-
     for (int block = 0; block < nb; block++) {
         const int dc = block < lim ? end : end + 1;
         polynomial rs_code(ec + dc);
-        
+
         for (int i = 0; i < dc; i++) {
             int ii = i * nb + block + ((block >= lim && i == dc - 1) ? rem : 0) ;
             rs_code[i] = stoi(src.substr(ii * 8, 8), nullptr, 2);
@@ -602,11 +600,6 @@ std::string QR::read (const std::vector<std::vector<int>> &qr) { // up to versio
 
 int main () {
 
-  /*
-  -to do : improve codewords placement on the grid for multi correction blocks
-  (blocks of variable size)
-  */
-
     std::vector<std::vector<int>> qr;
     std::string msg = "https://jbirnick.github.io/";
     // msg = "https://qrcode.com/";
@@ -616,39 +609,37 @@ int main () {
     std::cout << "text : [" << txt << "]\n";
 
 
-    // Image pic;
-    // // pic = Image::from_file ("pictures/Micro_QR_Example.pnm");
-    // // pic = Image::from_file ("pictures/ys2XE.pgm");
-    // pic = Image::from_file ("pictures/ex2.pnm");
-    // pic = simpl_thresh(pic);
-    // pic = crop(pic);
-    //
-    // qr = to_vec(pic);
-    // // std::vector<std::vector<int>> qr  = rescale(pic);
-    // // std::cout << grid(QR::make(1));
-    //
-    // if (qr.size() < 20) {
-    //     // Micro QR
-    //
-    // } else {
-    //     // QR code
-    //     std::vector<std::vector<int>> pattern(7, std::vector<int>(7));
-    //     const int size = qr.size();
-    //     int index = 0;
-    //     finder(pattern, 3, 3);
-    //
-    //     while (!identify(0, 0, qr, pattern) || !identify(size - 7, 0, qr, pattern) || !identify(0, size - 7, qr, pattern)) {
-    //         if (index > 4) {
-    //             std::cout << "can't find orientation.\n";
-    //             break;
-    //         }
-    //         qr = rotate(qr);
-    //         index++;
-    //     }
-    //
-    //     std::string txt = QR::read(qr);
-    //     std::cout << "text : [" << txt << "]";
-    // }
+    Image pic;
+    // pic = Image::from_file ("pictures/Micro_QR_Example.pnm");
+    // pic = Image::from_file ("pictures/ys2XE.pgm");
+    pic = Image::from_file ("pictures/ex2.pnm");
+    pic = simpl_thresh(pic);
+    pic = crop(pic);
+
+    qr = to_vec(pic);
+
+    if (qr.size() < 20) {
+        // Micro QR
+
+    } else {
+        // QR code
+        std::vector<std::vector<int>> pattern(7, std::vector<int>(7));
+        const int size = qr.size();
+        int index = 0;
+        finder(pattern, 3, 3);
+
+        while (!identify(0, 0, qr, pattern) || !identify(size - 7, 0, qr, pattern) || !identify(0, size - 7, qr, pattern)) {
+            if (index > 4) {
+                std::cout << "can't find orientation.\n";
+                break;
+            }
+            qr = rotate(qr);
+            index++;
+        }
+
+        std::string txt = QR::read(qr);
+        std::cout << "text : [" << txt << "]";
+    }
 
 
     std::cout << "\nexit\n";
