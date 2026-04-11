@@ -36,10 +36,10 @@ struct Image { // Image structure
         Image img (width, height, 255);
         u8 pixel, *out = img.pixels.data();
 
-        std::cout << "format : " << format << "\n";
-        std::cout << "width  : " << w << "\n";
-        std::cout << "height : " << h << "\n";
-        std::cout << "maxval : " << tmp << "\n";
+        // std::cout << "format : " << format << "\n";
+        // std::cout << "width  : " << w << "\n";
+        // std::cout << "height : " << h << "\n";
+        // std::cout << "maxval : " << tmp << "\n";
 
         if (format == "P1" || format == "P2") {
             for (size_t i = 0; i < dataSize; ++i) {
@@ -57,7 +57,7 @@ struct Image { // Image structure
             for (int i = 1; i < dataSize; i += 3) {
                 out[i / 3] = pixels[i];
             }
-        } else if (format == "P5") {
+        } else if (format == "P4" || format == "P5") {
             iss.read(reinterpret_cast<char*>(out), dataSize);
         } else if (format == "P6") {
             std::vector<u8> pixels(dataSize);
@@ -70,7 +70,7 @@ struct Image { // Image structure
 
         return img;
     }
-    static void to_file(const std::string &name, const Image &pic) {
+    static void to_file (const std::string &name, const Image &pic) {
         std::ofstream oss (name);
 
         oss << "P5" << "\n";

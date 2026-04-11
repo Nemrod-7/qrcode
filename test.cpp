@@ -5,7 +5,6 @@
 
 using namespace std;
 
-
 int shift (int codewords, int generator, int ec, int dc) {
 
     for (int i = dc - 1; i >= 0; i--) {
@@ -23,7 +22,7 @@ const int N = 15; // Codeword length
 const int K = 5;  // Message length
 
 // Perform polynomial division over GF(2)
-vector<int> poly_div(const vector<int> &dividend, const vector<int> &divisor) {
+vector<int> poly_div (const vector<int> &dividend, const vector<int> &divisor) {
     vector<int> remainder = dividend;
     int div_deg = divisor.size() - 1;
 
@@ -38,7 +37,7 @@ vector<int> poly_div(const vector<int> &dividend, const vector<int> &divisor) {
     return vector<int>(remainder.end() - div_deg, remainder.end());
 }
 
-vector<int> bch_encode(const vector<int>& message) {
+vector<int> bch_encode (const vector<int>& message) {
     if (message.size() != K) {
         throw invalid_argument("Message length must be 5 bits.");
     }

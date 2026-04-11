@@ -596,10 +596,9 @@ std::string QR::read (const std::vector<std::vector<int>> &qr) { // up to versio
     return decode(bits, info::mode[mode], mlen);
 }
 
-
-
 int main () {
 
+    //  (Needs perspective correction, de-warping, re-clocking bad distortions, etc.)
     std::vector<std::vector<int>> qr;
     std::string msg = "https://jbirnick.github.io/";
     // msg = "https://qrcode.com/";
@@ -617,7 +616,7 @@ int main () {
     pic = crop(pic);
 
     qr = to_vec(pic);
-
+    
     if (qr.size() < 20) {
         // Micro QR
 
