@@ -268,7 +268,7 @@ std::pair<std::vector<int>, std::vector<int>> init_tables(int prim = 0x11d, int 
 //             sieve[i*i/2::i] = [False] * ((n-i*i-1)/(2*i)+1)
 //     return [2] + [2*i+1 for i in xrange(1,n/2) if sieve[i]]
 
-std::vector<int> find_prime_polys(int alpha = 2, int c_exp = 8, int fast_primes = false, int single = false) {
+std::vector<int> find_prime_polys(int alpha = 2, int c_exp = 8, bool fast_primes = false, bool single = false) {
 //     Compute the list of prime polynomials for the given generator and galois field characteristic exponent.
 //     fast_primes will output less results but will be significantly faster.
 //     single will output the first prime polynomial found, so if all you want is to just find one prime polynomial to generate the LUT for Reed-Solomon to work, then just use that.
@@ -327,10 +327,10 @@ std::vector<int> find_prime_polys(int alpha = 2, int c_exp = 8, int fast_primes 
 }
 
 int main () {
-    std::vector<int> poly = find_prime_polys();
+    std::vector<int> poly = find_prime_polys(2,8,false,true);
 
     for (auto p : poly) {
-        std::cout << p << '\n';
+        printf("%i\n",p);
     }
 
 

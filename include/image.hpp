@@ -18,7 +18,7 @@ struct Image { // Image structure
     Image (int w, int h, u8 pixval) { width = w, height = h, pixels = std::vector<u8>(h * w, pixval);}; // pixel data constant
     Image (int w, int h, std::initializer_list<u8> data) { width = w, height = h, pixels = data; };
 
-    static Image from_file(const std::string &name) {
+    static Image from_file (const std::string &name) {
         std::ifstream iss (name, std::ios::in | std::ios::binary);
         std::string format, tmp, w, h;
 
